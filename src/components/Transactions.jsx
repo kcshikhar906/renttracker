@@ -4,6 +4,7 @@ import Layout from "./Layout";
 import TransactionList from "./TransactionList";
 import TransactionDetailModal from "./TransactionDetailModal";
 import EditTransactionModal from "./EditTransactionModal";
+import ExportMenu from "./ExportMenu";
 import { db, auth } from "../firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, query, where, orderBy, onSnapshot, deleteDoc, doc, getDocs } from "firebase/firestore";
@@ -322,12 +323,10 @@ export default function Transactions() {
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
                         </div>
-                        <button
-                            onClick={() => setIsProfileModalOpen(true)}
-                            className="w-full sm:w-auto px-6 py-4 bg-indigo-600 text-white hover:bg-indigo-700 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2"
-                        >
-                            <HiOutlineDocumentDownload className="text-lg" /> Export PDF Report
-                        </button>
+                        <ExportMenu
+                            data={filteredTransactions}
+                            onExportPDF={() => setIsProfileModalOpen(true)}
+                        />
                         <button
                             onClick={clearFilters}
                             className="w-full sm:w-auto px-6 py-4 bg-slate-800 text-slate-300 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border border-slate-700 hover:border-slate-500 flex items-center justify-center gap-2"
