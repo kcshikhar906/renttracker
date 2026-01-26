@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Dialog, Transition } from "@headlessui/react";
+import { Dialog, Transition, TransitionChild, DialogPanel, DialogBackdrop, DialogTitle } from "@headlessui/react";
 import { Fragment } from "react";
+import { motion } from "framer-motion";
 import { db, storage } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -10,51 +11,56 @@ import {
     getDocs,
     query,
     where,
-    updateDoc,
-    doc
+    orderBy,
+    limit,
+    Timestamp
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
     HiOutlineX,
     HiOutlineCalendar,
     HiOutlineCurrencyDollar,
-    HiOutlineDocumentText,
     HiOutlineUpload,
-    HiOutlineCheckCircle,
     HiOutlineOfficeBuilding,
     HiOutlineClock,
     HiOutlineSwitchHorizontal,
-    HiOutlineUserCircle
+    HiOutlineUserCircle,
+    HiOutlineArrowNarrowRight
 } from "react-icons/hi";
-import { format, addWeeks, addDays, parseISO } from "date-fns";
+import { format, addWeeks, addDays, parseISO, isValid, startOfToday } from "date-fns";
 
 export default function AddTransactionModal({ isOpen, onClose }) {
     const { currentUser } = useAuth();
     const [properties, setProperties] = useState([]);
     const [selectedPropertyId, setSelectedPropertyId] = useState("");
 
+    // History State
+    const [lastTxHistory, setLastTxHistory] = useState(null);
+
     // Form State
     const [type, setType] = useState("RENT");
     const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
-    const [duration, setDuration] = useState("1"); // In weeks
-    const [overrideStart, setOverrideStart] = useState("");
-    const [showOverride, setShowOverride] = useState(false);
+    const [duration, setDuration] = useState("1"); // 1-5 weeks
+    const [manualStart, setManualStart] = useState(format(new Date(), "yyyy-MM-dd"));
+    const [billAmount, setBillAmount] = useState("");
     const [notes, setNotes] = useState("");
     const [file, setFile] = useState(null);
-    const [status, setStatus] = useState("PAID");
     const [tenant, setTenant] = useState("");
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
 
-
-    // Fetch properties on open
+    // Fetch properties
     useEffect(() => {
         if (isOpen && currentUser) {
             async function fetchProperties() {
-                const q = query(collection(db, "properties"), where("uid", "==", currentUser.uid));
-                const snap = await getDocs(q);
-                const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                setProperties(data);
+                try {
+                    const q = query(collection(db, "properties"), where("uid", "==", currentUser.uid));
+                    const snap = await getDocs(q);
+                    const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setProperties(data);
+                } catch (err) {
+                    console.error("Error fetching properties:", err);
+                }
             }
             fetchProperties();
         }
@@ -65,30 +71,77 @@ export default function AddTransactionModal({ isOpen, onClose }) {
         properties.find(p => p.id === selectedPropertyId), [properties, selectedPropertyId]
     );
 
-    // Auto-fill tenant when property changes
+    // Smart Date Logic: Fetch last transaction when property changes
     useEffect(() => {
-        if (selectedProperty) {
-            setTenant(selectedProperty.tenantName);
+        if (selectedPropertyId && type === "RENT") {
+            async function fetchLastTx() {
+                try {
+                    const q = query(
+                        collection(db, "transactions"),
+                        where("propertyId", "==", selectedPropertyId),
+                        orderBy("periodEnd", "desc"), // Using existing field name for query
+                        limit(1)
+                    );
+                    const snap = await getDocs(q);
+                    if (!snap.empty) {
+                        const lastTx = { id: snap.docs[0].id, ...snap.docs[0].data() };
+                        console.log("Last Transaction Found:", lastTx);
+                        setLastTxHistory(lastTx);
+                    } else {
+                        console.log("No previous transaction found for property:", selectedPropertyId);
+                        setLastTxHistory(null);
+                    }
+                } catch (err) {
+                    console.error("Error fetching history:", err);
+                    setLastTxHistory(null);
+                }
+            }
+            fetchLastTx();
+        } else {
+            setLastTxHistory(null);
         }
-    }, [selectedProperty]);
+    }, [selectedPropertyId, type]);
 
-    // Logic for Rent Periods
-    const lastPaidTo = selectedProperty?.paidUpTo;
-    const periodStart = showOverride && overrideStart ? overrideStart : (lastPaidTo ? format(addDays(parseISO(lastPaidTo), 1), "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"));
+    // Calculate Period Start
+    const periodStart = useMemo(() => {
+        if (lastTxHistory?.periodEnd) {
+            // Handle both string and Timestamp formats for legacy compatibility
+            const lastEndDate = typeof lastTxHistory.periodEnd === 'string'
+                ? parseISO(lastTxHistory.periodEnd)
+                : lastTxHistory.periodEnd.toDate();
 
+            if (isValid(lastEndDate)) {
+                return format(addDays(lastEndDate, 1), "yyyy-MM-dd");
+            }
+        }
+        return manualStart;
+    }, [lastTxHistory, manualStart]);
+
+    // Calculate Period End
     const periodEnd = useMemo(() => {
-        if (duration === "CUSTOM") return periodStart;
-        return format(addWeeks(parseISO(periodStart), parseInt(duration)), "yyyy-MM-dd");
+        const start = parseISO(periodStart);
+        if (!isValid(start)) return periodStart;
+
+        // Recalculate based on duration change immediately
+        return format(addWeeks(start, parseInt(duration)), "yyyy-MM-dd");
     }, [periodStart, duration]);
 
     const totalAmount = useMemo(() => {
-        if (!selectedProperty || isNaN(duration)) return 0;
-        return selectedProperty.rentAmount * parseInt(duration);
+        if (!selectedProperty) return 0;
+        return (selectedProperty.rentAmount || 0) * parseInt(duration);
     }, [selectedProperty, duration]);
 
     async function handleSubmit(e) {
         e.preventDefault();
         if (!currentUser) return;
+        if (type === "RENT" && !selectedPropertyId) {
+            alert("Please select a property first.");
+            return;
+        }
+        if (type === "RENT" && !tenant) {
+            alert("Please select which tenant paid.");
+            return;
+        }
 
         try {
             setLoading(true);
@@ -102,32 +155,30 @@ export default function AddTransactionModal({ isOpen, onClose }) {
                 fileUrl = await getDownloadURL(uploadResult.ref);
             }
 
+            const settlementDate = parseISO(date);
+            const startD = parseISO(periodStart);
+            const endD = parseISO(periodEnd);
+
             const transactionData = {
                 uid: currentUser.uid,
-                propertyId: selectedPropertyId,
-                propertyName: selectedProperty?.name || "Manual",
+                propertyId: selectedPropertyId || null,
+                propertyName: selectedProperty?.name || "Manual/Other",
                 type,
-                date,
-                amount: type === "RENT" ? totalAmount : parseFloat(e.target.manualAmount?.value || 0),
+                date: Timestamp.fromDate(isValid(settlementDate) ? settlementDate : new Date()),
+                amount: type === "RENT" ? totalAmount : parseFloat(billAmount || 0),
                 notes,
-                status,
+                status: "PAID",
                 tenant,
-                periodStart: type === "RENT" ? periodStart : null,
-                periodEnd: type === "RENT" ? periodEnd : null,
+                // Saving as both for compatibility - User requested "endDate as Timestamps"
+                periodStart: type === "RENT" ? periodStart : null, // keep string for legacy/index compatibility
+                periodEnd: type === "RENT" ? periodEnd : null,   // keep string for logic
+                startDate: type === "RENT" && isValid(startD) ? Timestamp.fromDate(startD) : null,
+                endDate: type === "RENT" && isValid(endD) ? Timestamp.fromDate(endD) : null,
                 fileUrl: fileUrl || null,
                 createdAt: serverTimestamp(),
             };
 
-            // 1. Save Transaction
             await addDoc(collection(db, "transactions"), transactionData);
-
-            // 2. Update Property (Transactional Fix)
-            if (type === "RENT" && selectedPropertyId) {
-                await updateDoc(doc(db, "properties", selectedPropertyId), {
-                    paidUpTo: periodEnd,
-                    updatedAt: new Date().toISOString()
-                });
-            }
 
             setSuccess(true);
             setTimeout(() => {
@@ -137,7 +188,7 @@ export default function AddTransactionModal({ isOpen, onClose }) {
             }, 1500);
         } catch (err) {
             console.error("Save error:", err);
-            alert("Failed to secure transaction.");
+            alert("Failed to secure transaction: " + err.message);
         } finally {
             setLoading(false);
         }
@@ -145,158 +196,202 @@ export default function AddTransactionModal({ isOpen, onClose }) {
 
     function resetForm() {
         setSelectedPropertyId("");
+        setBillAmount("");
         setNotes("");
         setFile(null);
         setDuration("1");
-        setShowOverride(false);
+        setManualStart(format(new Date(), "yyyy-MM-dd"));
+        setTenant("");
+        setLastTxHistory(null);
+    }
+
+    function safeFormat(dateStr, formatStr) {
+        if (!dateStr) return "N/A";
+        const parsed = parseISO(dateStr);
+        return isValid(parsed) ? format(parsed, formatStr) : "Invalid Date";
     }
 
     return (
-        <Transition.Root show={isOpen} as={Fragment}>
-            <Dialog as="div" className="fixed inset-0 z-50 overflow-y-auto" onClose={onClose}>
-                <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-                    <Transition.Child as={Fragment} enter="ease-out duration-300" enterFrom="opacity-0" enterTo="opacity-100" leave="ease-in duration-200" leaveFrom="opacity-100" leaveTo="opacity-0">
-                        <Dialog.Overlay className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity" />
-                    </Transition.Child>
+        <Transition show={isOpen} as={Fragment}>
+            <Dialog as="div" className="relative z-50" onClose={onClose}>
+                <DialogBackdrop transition className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl transition-opacity duration-300" />
 
-                    <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-
-                    <Transition.Child as={Fragment} enter="ease-out duration-300" enterFrom="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" enterTo="opacity-100 translate-y-0 sm:scale-100" leave="ease-in duration-200" leaveFrom="opacity-100 translate-y-0 sm:scale-100" leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95">
-                        <div className="inline-block align-bottom bg-slate-900 rounded-3xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full border border-slate-800">
-                            <div className="bg-slate-900 px-6 pt-6 pb-8 sm:p-10">
-                                <div className="flex items-center justify-between mb-8">
-                                    <Dialog.Title as="h3" className="text-2xl font-bold text-slate-100 flex items-center gap-3">
-                                        <HiOutlineSwitchHorizontal className="text-brand" />
-                                        Record Payment
-                                    </Dialog.Title>
-                                    <button onClick={onClose} className="text-slate-500 hover:text-white border border-slate-800 p-2 rounded-xl transition-all">
-                                        <HiOutlineX className="text-xl" />
-                                    </button>
-                                </div>
-
-                                <form onSubmit={handleSubmit} className="space-y-6">
-                                    {/* Category & Property Selection */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Payment Category</label>
-                                            <div className="flex p-1 bg-slate-950 rounded-2xl border border-slate-800/50">
-                                                <button type="button" onClick={() => setType("RENT")} className={`flex-1 py-2 rounded-xl font-bold text-xs transition-all ${type === "RENT" ? "bg-brand text-white shadow-lg" : "text-slate-500 hover:text-slate-300"}`}>RENT</button>
-                                                <button type="button" onClick={() => setType("BILL")} className={`flex-1 py-2 rounded-xl font-bold text-xs transition-all ${type === "BILL" ? "bg-warning text-white shadow-lg" : "text-slate-500 hover:text-slate-300"}`}>BILL</button>
+                <div className="fixed inset-0 z-50 w-screen overflow-y-auto">
+                    <div className="flex min-h-full items-center justify-center p-4">
+                        <TransitionChild
+                            enter="ease-out duration-300"
+                            enterFrom="opacity-0 translate-y-12 scale-95"
+                            enterTo="opacity-100 translate-y-0 scale-100"
+                            leave="ease-in duration-200"
+                            leaveFrom="opacity-100 translate-y-0 scale-100"
+                            leaveTo="opacity-0 translate-y-12 scale-95"
+                        >
+                            <DialogPanel className="relative transform overflow-hidden rounded-[2.5rem] bg-slate-900 shadow-2xl transition-all w-full max-w-2xl border border-slate-800/50">
+                                <div className="bg-slate-900 px-6 pt-10 pb-8 sm:p-12">
+                                    <div className="flex items-center justify-between mb-10">
+                                        <DialogTitle as="h3" className="text-3xl font-black text-white tracking-tight flex items-center gap-4">
+                                            <div className="p-3 bg-brand rounded-2xl shadow-lg shadow-brand/20">
+                                                <HiOutlineSwitchHorizontal className="text-white text-2xl" />
                                             </div>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Select Property</label>
-                                            <div className="relative">
-                                                <HiOutlineOfficeBuilding className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-lg" />
-                                                <select
-                                                    required
-                                                    className="input-field pl-12 appearance-none"
-                                                    value={selectedPropertyId}
-                                                    onChange={(e) => setSelectedPropertyId(e.target.value)}
-                                                >
-                                                    <option value="">Select a unit...</option>
-                                                    {properties.map(p => (
-                                                        <option key={p.id} value={p.id}>{p.name} - ${p.rentAmount}/wk</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                        </div>
+                                            Record Settlement
+                                        </DialogTitle>
+                                        <button onClick={onClose} className="text-slate-500 hover:text-white bg-slate-850 p-3 rounded-2xl transition-all active:scale-90">
+                                            <HiOutlineX className="text-xl" />
+                                        </button>
                                     </div>
 
-                                    {type === "RENT" && selectedProperty && (
-                                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="bg-slate-950 rounded-3xl p-6 border border-slate-800/50 space-y-6">
-                                            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-                                                <div className="flex items-center gap-3">
-                                                    <HiOutlineClock className="text-slate-500 text-xl" />
-                                                    <div>
-                                                        <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest leading-none mb-1">Last Coverage End</p>
-                                                        <p className="text-sm font-bold text-slate-300">{lastPaidTo ? format(parseISO(lastPaidTo), "MMM dd, yyyy") : "N/A"}</p>
-                                                    </div>
-                                                </div>
-                                                <button type="button" onClick={() => setShowOverride(!showOverride)} className={`text-[10px] font-bold px-3 py-1.5 rounded-full border transition-all ${showOverride ? "bg-brand/10 border-brand text-brand" : "border-slate-800 text-slate-500"}`}>
-                                                    OVERRIDE DATE
-                                                </button>
-                                            </div>
+                                    <form onSubmit={handleSubmit} className="space-y-8">
+                                        {/* Category Selection */}
+                                        <div className="flex p-1.5 bg-slate-950 rounded-2xl border border-slate-800/50">
+                                            <button type="button" onClick={() => setType("RENT")} className={`flex-1 py-3.5 rounded-xl font-black text-[10px] tracking-[0.2em] uppercase transition-all ${type === "RENT" ? "bg-brand text-white shadow-lg shadow-brand/20" : "text-slate-500 hover:text-slate-300"}`}>RENT SETTLEMENT</button>
+                                            <button type="button" onClick={() => setType("BILL")} className={`flex-1 py-3.5 rounded-xl font-black text-[10px] tracking-[0.2em] uppercase transition-all ${type === "BILL" ? "bg-warning text-white shadow-lg shadow-warning/20" : "text-slate-500 hover:text-slate-300"}`}>BILL / UTILITY</button>
+                                        </div>
 
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                <div className="space-y-2">
-                                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Period Start</label>
-                                                    <input
-                                                        type="date"
-                                                        readOnly={!showOverride}
-                                                        className={`input-field !bg-slate-950 font-bold ${!showOverride ? "border-transparent opacity-60" : "border-brand"}`}
-                                                        value={periodStart}
-                                                        onChange={(e) => setOverrideStart(e.target.value)}
-                                                    />
-                                                </div>
-
-                                                <div className="space-y-2">
-                                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Duration</label>
-                                                    <select className="input-field appearance-none" value={duration} onChange={(e) => setDuration(e.target.value)}>
-                                                        <option value="1">1 Week</option>
-                                                        <option value="2">2 Weeks</option>
-                                                        <option value="4">4 Weeks</option>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.15em] pl-1">Allocated Asset</label>
+                                                <div className="relative">
+                                                    <HiOutlineOfficeBuilding className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-lg" />
+                                                    <select
+                                                        required
+                                                        className="input-field pl-12 appearance-none"
+                                                        value={selectedPropertyId}
+                                                        onChange={(e) => setSelectedPropertyId(e.target.value)}
+                                                    >
+                                                        <option value="">Select Target Unit...</option>
+                                                        {properties.map(p => (
+                                                            <option key={p.id} value={p.id}>{p.name}</option>
+                                                        ))}
                                                     </select>
                                                 </div>
                                             </div>
 
-                                            <div className="bg-slate-900 rounded-2xl p-4 flex items-center justify-between border border-slate-800/50">
-                                                <div>
-                                                    <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-1">Coverage End</p>
-                                                    <p className="text-lg font-black text-white">{format(parseISO(periodEnd), "MMMM dd, yyyy")}</p>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.15em] pl-1">Paid By (Tenant)</label>
+                                                <div className="relative">
+                                                    <HiOutlineUserCircle className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-lg" />
+                                                    <select
+                                                        required
+                                                        className="input-field pl-12 appearance-none"
+                                                        value={tenant}
+                                                        onChange={(e) => setTenant(e.target.value)}
+                                                    >
+                                                        <option value="">Select Resident...</option>
+                                                        {selectedProperty?.tenantNames?.map((name, i) => (
+                                                            <option key={i} value={name}>{name}</option>
+                                                        ))}
+                                                        {selectedProperty && (!selectedProperty.tenantNames || selectedProperty.tenantNames.length === 0) && (
+                                                            <option disabled>No tenants found - Go to Settings</option>
+                                                        )}
+                                                    </select>
                                                 </div>
-                                                <div className="text-right">
-                                                    <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-1">Total Due</p>
-                                                    <p className="text-lg font-black text-success">${totalAmount.toFixed(2)}</p>
+                                            </div>
+                                        </div>
+
+                                        {/* RENT LOGIC */}
+                                        {type === "RENT" && selectedProperty && (
+                                            <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="space-y-6">
+                                                <div className="grid grid-cols-2 gap-6">
+                                                    <div className="space-y-2">
+                                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.15em] pl-1">Start Date</label>
+                                                        <input
+                                                            type="date"
+                                                            readOnly={!!lastTxHistory}
+                                                            className={`input-field font-bold ${lastTxHistory ? "opacity-60 border-brand/20 bg-brand/5 cursor-not-allowed" : "border-brand"}`}
+                                                            value={periodStart}
+                                                            onChange={(e) => setManualStart(e.target.value)}
+                                                        />
+                                                        {lastTxHistory && (
+                                                            <p className="text-[9px] font-bold text-slate-500 pl-1">Locked sync with history</p>
+                                                        )}
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.15em] pl-1">Commit Duration</label>
+                                                        <select className="input-field font-bold" value={duration} onChange={(e) => setDuration(e.target.value)}>
+                                                            <option value="1">1 Week</option>
+                                                            <option value="2">2 Weeks</option>
+                                                            <option value="3">3 Weeks</option>
+                                                            <option value="4">4 Weeks</option>
+                                                            <option value="5">5 Weeks</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+
+                                                {/* Summary Box */}
+                                                <div className="bg-slate-950 rounded-[2.5rem] p-8 border border-slate-800 shadow-inner flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative group">
+                                                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                                                        <HiOutlineClock className="text-8xl text-brand" />
+                                                    </div>
+                                                    <div className="relative z-10 text-center md:text-left">
+                                                        <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] mb-3">Coverage Period</p>
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="text-lg font-black text-white">{safeFormat(periodStart, "MMM dd")}</span>
+                                                            <HiOutlineArrowNarrowRight className="text-slate-700" />
+                                                            <span className="text-lg font-black text-white">{safeFormat(periodEnd, "MMM dd, yyyy")}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="relative z-10 text-center md:text-right border-t md:border-t-0 md:border-l border-slate-800 pt-6 md:pt-0 md:pl-8">
+                                                        <p className="text-[10px] font-black text-brand uppercase tracking-[0.2em] mb-3">Total Settlement</p>
+                                                        <p className="text-4xl font-black text-white leading-none tracking-tight">
+                                                            <span className="text-brand mr-1">$</span>
+                                                            {totalAmount.toLocaleString()}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        )}
+
+                                        {/* BILL LOGIC */}
+                                        {type === "BILL" && (
+                                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Bill Amount</label>
+                                                <div className="relative">
+                                                    <HiOutlineCurrencyDollar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-lg" />
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        required
+                                                        className="input-field pl-12"
+                                                        placeholder="0.00"
+                                                        value={billAmount}
+                                                        onChange={(e) => setBillAmount(e.target.value)}
+                                                    />
+                                                </div>
+                                            </motion.div>
+                                        )}
+
+                                        <div className="grid grid-cols-2 gap-6">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Payment Date</label>
+                                                <input type="date" className="input-field" value={date} onChange={(e) => setDate(e.target.value)} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Documentation</label>
+                                                <div className="relative group">
+                                                    <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={(e) => setFile(e.target.files[0])} />
+                                                    <div className="input-field flex items-center gap-3 overflow-hidden">
+                                                        <HiOutlineUpload className="text-slate-500 flex-shrink-0" />
+                                                        <span className="text-xs text-slate-400 truncate">{file ? file.name : "Attach Receipt"}</span>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </motion.div>
-                                    )}
+                                        </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Payment Date</label>
-                                            <div className="relative">
-                                                <HiOutlineCalendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
-                                                <input type="date" className="input-field pl-12" value={date} onChange={(e) => setDate(e.target.value)} />
-                                            </div>
+                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Internal Notes</label>
+                                            <textarea className="input-field h-24 pt-4 resize-none" placeholder="Administrative comments..." value={notes} onChange={(e) => setNotes(e.target.value)} />
                                         </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Tenant</label>
-                                            <div className="relative">
-                                                <HiOutlineUserCircle className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-lg" />
-                                                <input className="input-field pl-12" value={tenant} onChange={(e) => setTenant(e.target.value)} />
-                                            </div>
-                                        </div>
-                                    </div>
 
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Evidence / Proof</label>
-                                        <div className="group relative border border-slate-800 rounded-2xl p-6 hover:border-brand/40 transition-all bg-slate-950/20">
-                                            <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={(e) => setFile(e.target.files[0])} />
-                                            <div className="flex items-center gap-4">
-                                                <HiOutlineUpload className="text-2xl text-slate-600 group-hover:text-brand transition-colors" />
-                                                <span className="text-xs text-slate-500 group-hover:text-slate-300 truncate">{file ? file.name : "Upload screenshot/receipt"}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="pt-4 flex items-center gap-4">
-                                        <button disabled={loading || success} type="submit" className="btn-primary flex-1 py-4 text-xs font-black uppercase tracking-[0.2em]">
-                                            {loading ? "Authorizing..." : success ? "Verified & Saved" : "Confirm Settlement"}
+                                        <button disabled={loading || success} type="submit" className="btn-primary w-full py-5 text-xs font-black uppercase tracking-[0.3em] shadow-2xl shadow-brand/20">
+                                            {loading ? "Authenticating..." : success ? "Verified & Recorded" : "Commit Statement"}
                                         </button>
-                                        <div className="flex items-center gap-2">
-                                            <div className={`w-3 h-3 rounded-full ${status === 'PAID' ? 'bg-success' : 'bg-warning'} animate-pulse`}></div>
-                                            <span className="text-[10px] font-black text-slate-500 uppercase">System Active</span>
-                                        </div>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </Transition.Child>
+                                    </form>
+                                </div>
+                            </DialogPanel>
+                        </TransitionChild>
+                    </div>
                 </div>
             </Dialog>
-        </Transition.Root>
+        </Transition>
     );
 }

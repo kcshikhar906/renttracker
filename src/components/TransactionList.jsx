@@ -1,157 +1,134 @@
 import React from "react";
-import { db } from "../firebase";
-import { doc, deleteDoc } from "firebase/firestore";
 import {
-    HiOutlineTrash,
-    HiOutlineExternalLink,
-    HiOutlineCollection,
-    HiOutlineInbox,
-    HiOutlineArchive
+    HiOutlineEye,
+    HiOutlineArchive,
+    HiOutlineOfficeBuilding,
+    HiOutlineUserCircle,
+    HiOutlineCalendar,
+    HiOutlineClock
 } from "react-icons/hi";
-import { motion, AnimatePresence } from "framer-motion";
+import { format, isValid, parseISO } from "date-fns";
 
-export default function TransactionList({ transactions, loading }) {
+export default function TransactionList({ transactions, loading, onSelect }) {
 
-    async function handleDelete(id) {
-        if (window.confirm("Are you sure you want to delete this record? This cannot be undone.")) {
-            try {
-                await deleteDoc(doc(db, "transactions", id));
-            } catch (err) {
-                console.error("Deletion failed:", err);
-            }
-        }
-    }
+    const safeFormat = (dateData, formatStr) => {
+        if (!dateData) return "—";
+        const date = typeof dateData === 'string' ? parseISO(dateData) : dateData.toDate();
+        return isValid(date) ? format(date, formatStr) : "Invalid";
+    };
 
     if (loading) {
         return (
-            <div className="py-20 flex flex-col items-center gap-4">
-                <div className="w-10 h-10 border-4 border-slate-800 border-t-brand rounded-full animate-spin"></div>
-                <p className="text-slate-500 text-sm font-bold uppercase tracking-widest">Updating Ledger</p>
+            <div className="py-24 flex flex-col items-center gap-4">
+                <div className="w-12 h-12 border-4 border-slate-800 border-t-brand rounded-full animate-spin"></div>
+                <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.3em]">Querying Database</p>
             </div>
         );
     }
 
     if (transactions.length === 0) {
         return (
-            <div className="bg-slate-900 border border-slate-800 border-dashed rounded-3xl py-20 flex flex-col items-center text-center">
-                <HiOutlineArchive className="text-5xl text-slate-700 mb-4" />
-                <h4 className="text-lg font-bold text-slate-300">No records found</h4>
-                <p className="text-slate-500 text-sm max-w-xs mx-auto mt-2">
-                    Your transaction ledger is currently empty. Start by adding a new record.
+            <div className="bg-slate-900/50 border border-slate-800 border-dashed rounded-[2rem] py-24 flex flex-col items-center text-center">
+                <HiOutlineArchive className="text-6xl text-slate-800 mb-6 opacity-40" />
+                <h4 className="text-xl font-black text-slate-300 uppercase tracking-tight">Vault Empty</h4>
+                <p className="text-slate-500 text-xs max-w-[240px] mx-auto mt-3 font-medium leading-relaxed">
+                    No matches found for current filter criteria.
                 </p>
             </div>
         );
     }
 
     return (
-        <div className="space-y-4">
-            {/* Desktop View: Table */}
-            <div className="hidden lg:block overflow-hidden bg-slate-900 border border-slate-800 rounded-2xl">
-                <table className="w-full text-left border-collapse">
-                    <thead>
-                        <tr className="bg-slate-950/50 text-slate-500 uppercase text-[10px] font-bold tracking-widest border-b border-slate-800">
-                            <th className="px-6 py-4">Status</th>
-                            <th className="px-6 py-4">Category</th>
-                            <th className="px-6 py-4">Date</th>
-                            <th className="px-6 py-4">Notes</th>
-                            <th className="px-6 py-4">Amount</th>
-                            <th className="px-6 py-4 text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800">
-                        {transactions.map((t) => (
-                            <tr key={t.id} className="hover:bg-white/[0.02] transition-colors group">
-                                <td className="px-6 py-4">
-                                    <span className="flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-success"></span>
-                                        <span className="text-xs font-medium text-slate-400">Settled</span>
+        <div className="overflow-x-auto">
+            <table className="w-full text-left border-separate border-spacing-y-2">
+                <thead>
+                    <tr className="text-slate-500 uppercase text-[9px] font-black tracking-[0.2em]">
+                        <th className="px-5 py-2">Filing Date</th>
+                        <th className="px-5 py-2">Asset Unit</th>
+                        <th className="px-5 py-2">Coverage Period</th>
+                        <th className="px-5 py-2">Settled By</th>
+                        <th className="px-5 py-2">Amount</th>
+                        <th className="px-5 py-2">Status</th>
+                        <th className="px-5 py-2 text-right">Audit</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-transparent">
+                    {transactions.map((t) => (
+                        <tr
+                            key={t.id}
+                            onClick={() => onSelect(t)}
+                            className="bg-slate-950/40 hover:bg-slate-800/40 transition-all cursor-pointer group rounded-xl"
+                        >
+                            <td className="px-5 py-3 first:rounded-l-2xl">
+                                <div className="flex flex-col">
+                                    <span className="text-xs font-bold text-slate-200">
+                                        {safeFormat(t.date, "MMM dd, yyyy")}
                                     </span>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-tighter ${t.type === "RENT" ? "bg-brand/10 text-brand border border-brand/20" : "bg-warning/10 text-warning border border-warning/20"
-                                        }`}>
-                                        {t.type}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4 text-sm text-slate-400 font-medium">
-                                    {new Date(t.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                </td>
-                                <td className="px-6 py-4 text-sm text-slate-500 max-w-xs truncate italic">
-                                    {t.notes || "—"}
-                                </td>
-                                <td className="px-6 py-4 font-bold text-slate-200">
-                                    ${t.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                    <div className="flex items-center justify-end gap-2">
-                                        {t.fileUrl && (
-                                            <a
-                                                href={t.fileUrl}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="p-2 text-slate-500 hover:text-brand transition-colors bg-slate-950 rounded-lg border border-slate-800 hover:border-brand/40"
-                                                title="View Receipt"
-                                            >
-                                                <HiOutlineExternalLink className="text-lg" />
-                                            </a>
-                                        )}
-                                        <button
-                                            onClick={() => handleDelete(t.id)}
-                                            className="p-2 text-slate-500 hover:text-danger transition-colors bg-slate-950 rounded-lg border border-slate-800 hover:border-danger/40"
-                                            title="Delete Record"
-                                        >
-                                            <HiOutlineTrash className="text-lg" />
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-
-            {/* Mobile/Tablet View: Cards */}
-            <div className="lg:hidden space-y-4">
-                {transactions.map((t) => (
-                    <motion.div
-                        key={t.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="stats-card relative overflow-hidden"
-                    >
-                        <div className={`absolute top-0 left-0 w-1.5 h-full ${t.type === "RENT" ? "bg-brand" : "bg-warning"}`}></div>
-                        <div className="flex justify-between items-start mb-4">
-                            <div className="flex flex-col gap-1">
-                                <span className={`text-[9px] font-bold uppercase tracking-widest ${t.type === "RENT" ? "text-brand" : "text-warning"}`}>
-                                    {t.type}
-                                </span>
-                                <span className="text-lg font-bold text-slate-100 italic">
-                                    {new Date(t.date).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}
-                                </span>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-xl font-black text-white leading-none">
-                                    ${t.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                </p>
-                                <div className="flex items-center gap-2 mt-2 justify-end">
-                                    {t.fileUrl && (
-                                        <a href={t.fileUrl} target="_blank" rel="noopener noreferrer" className="text-slate-500 active:text-brand">
-                                            <HiOutlineExternalLink className="text-xl" />
-                                        </a>
-                                    )}
-                                    <button onClick={() => handleDelete(t.id)} className="text-slate-500 active:text-danger">
-                                        <HiOutlineTrash className="text-xl" />
-                                    </button>
                                 </div>
-                            </div>
-                        </div>
-                        {t.notes && (
-                            <p className="text-xs text-slate-500 italic mt-2 line-clamp-2 border-t border-slate-800 pt-3">
-                                "{t.notes}"
-                            </p>
-                        )}
-                    </motion.div>
-                ))}
+                            </td>
+
+                            <td className="px-5 py-3">
+                                <div className="flex items-center gap-2">
+                                    <HiOutlineOfficeBuilding className="text-slate-600 text-sm" />
+                                    <span className="text-xs font-bold text-slate-400 group-hover:text-white transition-colors">
+                                        {t.propertyName || "Other"}
+                                    </span>
+                                </div>
+                            </td>
+
+                            <td className="px-5 py-3">
+                                {t.type === "RENT" ? (
+                                    <div className="flex items-center gap-2">
+                                        <HiOutlineClock className="text-slate-650 text-xs" />
+                                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">
+                                            {safeFormat(t.periodStart, "MMM dd")} - {safeFormat(t.periodEnd, "MMM dd")}
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <span className="text-[10px] font-bold text-warning uppercase">Utility/Bill</span>
+                                )}
+                            </td>
+
+                            <td className="px-5 py-3">
+                                <div className="flex items-center gap-2">
+                                    <HiOutlineUserCircle className="text-slate-600" />
+                                    <span className="text-xs font-medium text-slate-400">
+                                        {t.tenant || "System"}
+                                    </span>
+                                </div>
+                            </td>
+
+                            <td className="px-5 py-3">
+                                <span className="text-sm font-black text-white">
+                                    ${t.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </span>
+                            </td>
+
+                            <td className="px-5 py-3">
+                                <div className="flex items-center gap-2">
+                                    <div className={`w-1.5 h-1.5 rounded-full ${t.status === 'PAID' ? 'bg-success shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-warning'}`}></div>
+                                    <span className={`text-[9px] font-black uppercase tracking-widest ${t.status === 'PAID' ? 'text-success' : 'text-warning'}`}>
+                                        {t.status || "Pending"}
+                                    </span>
+                                </div>
+                            </td>
+
+                            <td className="px-5 py-3 text-right last:rounded-r-2xl">
+                                <button
+                                    className="p-2 bg-slate-900 border border-slate-800 text-slate-500 rounded-xl group-hover:bg-brand group-hover:text-white group-hover:border-brand/50 transition-all shadow-sm"
+                                    title="View Statement"
+                                >
+                                    <HiOutlineEye className="text-lg" />
+                                </button>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+
+            {/* Mobile Indicator */}
+            <div className="lg:hidden text-center py-4 bg-slate-950/20 rounded-2xl border border-slate-800/50 mt-4">
+                <p className="text-[9px] font-bold text-slate-600 uppercase tracking-[0.1em]">Scroll horizontally for full ledger</p>
             </div>
         </div>
     );
