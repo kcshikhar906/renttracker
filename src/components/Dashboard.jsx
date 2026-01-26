@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import Layout from "./Layout";
 import TransactionList from "./TransactionList";
+import ExpenseCharts from "./ExpenseCharts";
 import { db, auth } from "../firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, query, where, orderBy, onSnapshot, deleteDoc, doc } from "firebase/firestore";
@@ -130,6 +131,9 @@ export default function Dashboard() {
                         colorClass="text-success"
                     />
                 </div>
+
+                {/* Visual Analytics */}
+                <ExpenseCharts transactions={transactions} />
 
                 {/* Recent Transactions */}
                 <section>

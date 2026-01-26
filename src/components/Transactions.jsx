@@ -247,8 +247,8 @@ export default function Transactions() {
                 valign: 'middle'
             },
             columnStyles: {
-                4: { fontStyle: 'bold', halign: 'right' }, // Amount
-                5: { halign: 'center' } // Status
+                [tableHead[0].indexOf('Amount')]: { fontStyle: 'bold', halign: 'right' },
+                [tableHead[0].indexOf('Status')]: { halign: 'center' }
             },
             alternateRowStyles: { fillColor: [248, 250, 252] }
         });
