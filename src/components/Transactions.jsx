@@ -33,6 +33,7 @@ export default function Transactions() {
     const [exportOptions, setExportOptions] = useState({
         showNotes: true,
         showSummary: true,
+        showSettledBy: true,
         reportTitle: "FINANCIAL STATEMENT",
         headerColor: [15, 23, 42] // slate-900
     });
@@ -208,6 +209,10 @@ export default function Transactions() {
                 t.status
             ];
 
+            if (exportOptions.showSettledBy) {
+                row.push(t.tenant || "System");
+            }
+
             if (exportOptions.showNotes) {
                 row.push(t.notes || "—");
             }
@@ -216,6 +221,9 @@ export default function Transactions() {
         });
 
         const tableHead = [['Date', 'Unit/Asset', 'Category', 'Description', 'Amount', 'Status']];
+        if (exportOptions.showSettledBy) {
+            tableHead[0].push('Settled By');
+        }
         if (exportOptions.showNotes) {
             tableHead[0].push('Memo/Notes');
         }
@@ -576,8 +584,8 @@ export default function Transactions() {
                                                         key={c.name}
                                                         onClick={() => setExportOptions(prev => ({ ...prev, headerColor: c.color }))}
                                                         className={`w-10 h-10 rounded-full border-2 transition-all ${JSON.stringify(exportOptions.headerColor) === JSON.stringify(c.color)
-                                                                ? 'border-white scale-110 shadow-lg'
-                                                                : 'border-transparent opacity-50 hover:opacity-100'
+                                                            ? 'border-white scale-110 shadow-lg'
+                                                            : 'border-transparent opacity-50 hover:opacity-100'
                                                             }`}
                                                         style={{ backgroundColor: `rgb(${c.color.join(',')})` }}
                                                         title={c.name}
@@ -587,27 +595,38 @@ export default function Transactions() {
                                         </div>
 
                                         {/* Toggles */}
-                                        <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             <button
                                                 onClick={() => setExportOptions(prev => ({ ...prev, showNotes: !prev.showNotes }))}
                                                 className={`p-4 rounded-2xl border transition-all flex flex-col gap-1 text-left ${exportOptions.showNotes
-                                                        ? 'bg-brand/10 border-brand/40'
-                                                        : 'bg-slate-950 border-slate-800 opacity-60'
+                                                    ? 'bg-brand/10 border-brand/40'
+                                                    : 'bg-slate-950 border-slate-800 opacity-60'
                                                     }`}
                                             >
                                                 <span className="text-xs font-black text-white">Include Notes</span>
-                                                <span className="text-[9px] text-slate-500">Add Memo column to table</span>
+                                                <span className="text-[9px] text-slate-500">Memo column</span>
+                                            </button>
+
+                                            <button
+                                                onClick={() => setExportOptions(prev => ({ ...prev, showSettledBy: !prev.showSettledBy }))}
+                                                className={`p-4 rounded-2xl border transition-all flex flex-col gap-1 text-left ${exportOptions.showSettledBy
+                                                    ? 'bg-brand/10 border-brand/40'
+                                                    : 'bg-slate-950 border-slate-800 opacity-60'
+                                                    }`}
+                                            >
+                                                <span className="text-xs font-black text-white">Settled By</span>
+                                                <span className="text-[9px] text-slate-500">Resident column</span>
                                             </button>
 
                                             <button
                                                 onClick={() => setExportOptions(prev => ({ ...prev, showSummary: !prev.showSummary }))}
                                                 className={`p-4 rounded-2xl border transition-all flex flex-col gap-1 text-left ${exportOptions.showSummary
-                                                        ? 'bg-brand/10 border-brand/40'
-                                                        : 'bg-slate-950 border-slate-800 opacity-60'
+                                                    ? 'bg-brand/10 border-brand/40'
+                                                    : 'bg-slate-950 border-slate-800 opacity-60'
                                                     }`}
                                             >
                                                 <span className="text-xs font-black text-white">Financial Summary</span>
-                                                <span className="text-[9px] text-slate-500">Calculate totals at footer</span>
+                                                <span className="text-[9px] text-slate-500">Footer totals</span>
                                             </button>
                                         </div>
 

@@ -30,6 +30,7 @@ import { format, parseISO, isValid, addDays, addWeeks } from "date-fns";
 export default function EditTransactionModal({ isOpen, onClose, transaction }) {
     const { currentUser } = useAuth();
     const [properties, setProperties] = useState([]);
+    const [allTenants, setAllTenants] = useState([]);
 
     // Form State
     const [type, setType] = useState("RENT");
@@ -68,7 +69,7 @@ export default function EditTransactionModal({ isOpen, onClose, transaction }) {
         }
     }, [transaction]);
 
-    // Fetch properties for the dropdown
+    // Fetch properties and collect all tenant names for the dropdown
     useEffect(() => {
         if (isOpen && currentUser) {
             async function fetchProperties() {
@@ -77,8 +78,17 @@ export default function EditTransactionModal({ isOpen, onClose, transaction }) {
                     const snap = await getDocs(q);
                     const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     setProperties(data);
+
+                    // Consolidate all unique tenant names across all managed properties
+                    const uniqueTenants = new Set();
+                    data.forEach(p => {
+                        if (p.tenantNames && Array.isArray(p.tenantNames)) {
+                            p.tenantNames.forEach(name => uniqueTenants.add(name));
+                        }
+                    });
+                    setAllTenants(Array.from(uniqueTenants).sort());
                 } catch (err) {
-                    console.error("Error fetching properties:", err);
+                    console.error("Error fetching properties/tenants:", err);
                 }
             }
             fetchProperties();
@@ -184,12 +194,22 @@ export default function EditTransactionModal({ isOpen, onClose, transaction }) {
                                             <div className="space-y-2">
                                                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Resident / Tenant</label>
                                                 <div className="relative">
-                                                    <HiOutlineUserCircle className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-lg" />
-                                                    <input
-                                                        className="input-field pl-12"
+                                                    <HiOutlineUserCircle className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-lg pointer-events-none z-10" />
+                                                    <select
+                                                        className="input-field pl-12 font-bold"
                                                         value={tenant}
                                                         onChange={(e) => setTenant(e.target.value)}
-                                                    />
+                                                        required
+                                                    >
+                                                        <option value="">Select Resident</option>
+                                                        {allTenants.map((name, idx) => (
+                                                            <option key={idx} value={name}>{name}</option>
+                                                        ))}
+                                                        {/* Fallback for system records or legacy names */}
+                                                        {tenant && !allTenants.includes(tenant) && (
+                                                            <option value={tenant}>{tenant} (Current)</option>
+                                                        )}
+                                                    </select>
                                                 </div>
                                             </div>
                                             <div className="space-y-2">
