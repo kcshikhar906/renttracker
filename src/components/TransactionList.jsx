@@ -7,7 +7,7 @@ import {
     HiOutlineCalendar,
     HiOutlineClock
 } from "react-icons/hi";
-import { format, isValid, parseISO } from "date-fns";
+import { format, isValid, parseISO, differenceInDays } from "date-fns";
 
 export default function TransactionList({ transactions, loading, onSelect }) {
 
@@ -64,6 +64,11 @@ export default function TransactionList({ transactions, loading, onSelect }) {
                                     <span className="text-xs font-bold text-slate-200">
                                         {safeFormat(t.date, "MMM dd, yyyy")}
                                     </span>
+                                    {t.createdAt && (
+                                        <span className="text-[9px] font-medium text-slate-500 mt-0.5 uppercase tracking-tighter">
+                                            Added: {safeFormat(t.createdAt, "hh:mm a")}
+                                        </span>
+                                    )}
                                 </div>
                             </td>
 
@@ -78,14 +83,36 @@ export default function TransactionList({ transactions, loading, onSelect }) {
 
                             <td className="px-5 py-3">
                                 {t.type === "RENT" ? (
-                                    <div className="flex items-center gap-2">
-                                        <HiOutlineClock className="text-slate-650 text-xs" />
-                                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">
-                                            {safeFormat(t.periodStart, "MMM dd")} - {safeFormat(t.periodEnd, "MMM dd")}
-                                        </span>
+                                    <div className="flex flex-col">
+                                        <div className="flex items-center gap-2">
+                                            <HiOutlineClock className="text-slate-650 text-xs" />
+                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">
+                                                {safeFormat(t.periodStart, "MMM dd")} - {safeFormat(t.periodEnd, "MMM dd")}
+                                            </span>
+                                        </div>
+                                        {t.periodStart && t.periodEnd && (
+                                            <span className="text-[9px] font-bold text-slate-600 uppercase mt-0.5 pl-5">
+                                                {(() => {
+                                                    const start = typeof t.periodStart === 'string' ? parseISO(t.periodStart) : t.periodStart.toDate();
+                                                    const end = typeof t.periodEnd === 'string' ? parseISO(t.periodEnd) : t.periodEnd.toDate();
+                                                    if (!isValid(start) || !isValid(end)) return "";
+                                                    const totalDays = differenceInDays(end, start) + 1;
+                                                    const weeks = Math.floor(totalDays / 7);
+                                                    const rem = totalDays % 7;
+                                                    return `${weeks > 0 ? `${weeks}W` : ''}${weeks > 0 && rem > 0 ? ' ' : ''}${rem > 0 ? `${rem}D` : ''} (${totalDays} Days)`;
+                                                })()}
+                                            </span>
+                                        )}
                                     </div>
                                 ) : (
-                                    <span className="text-[10px] font-bold text-warning uppercase">Utility/Bill</span>
+                                    <div className="flex flex-col">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] font-black text-warning uppercase bg-warning/10 border border-warning/20 px-2 py-0.5 rounded-full">
+                                                {t.utilityType || "Utility"}
+                                            </span>
+                                        </div>
+                                        <span className="text-[9px] font-bold text-slate-600 uppercase mt-1 pl-1">Standard Billing</span>
+                                    </div>
                                 )}
                             </td>
 

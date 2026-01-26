@@ -25,9 +25,10 @@ import {
     HiOutlineClock,
     HiOutlineSwitchHorizontal,
     HiOutlineUserCircle,
-    HiOutlineArrowNarrowRight
+    HiOutlineArrowNarrowRight,
+    HiOutlineInformationCircle
 } from "react-icons/hi";
-import { format, addWeeks, addDays, parseISO, isValid, startOfToday } from "date-fns";
+import { format, addWeeks, addDays, parseISO, isValid, isBefore, isAfter, isSameDay } from "date-fns";
 
 export default function AddTransactionModal({ isOpen, onClose }) {
     const { currentUser } = useAuth();
@@ -43,6 +44,8 @@ export default function AddTransactionModal({ isOpen, onClose }) {
     const [duration, setDuration] = useState("1"); // 1-5 weeks
     const [manualStart, setManualStart] = useState(format(new Date(), "yyyy-MM-dd"));
     const [billAmount, setBillAmount] = useState("");
+    const [utilityType, setUtilityType] = useState("ELECTRICITY");
+    const [status, setStatus] = useState("PAID");
     const [notes, setNotes] = useState("");
     const [file, setFile] = useState(null);
     const [tenant, setTenant] = useState("");
@@ -78,8 +81,9 @@ export default function AddTransactionModal({ isOpen, onClose }) {
                 try {
                     const q = query(
                         collection(db, "transactions"),
+                        where("uid", "==", currentUser.uid),
                         where("propertyId", "==", selectedPropertyId),
-                        orderBy("periodEnd", "desc"), // Using existing field name for query
+                        orderBy("periodEnd", "desc"),
                         limit(1)
                     );
                     const snap = await getDocs(q);
@@ -105,7 +109,6 @@ export default function AddTransactionModal({ isOpen, onClose }) {
     // Calculate Period Start
     const periodStart = useMemo(() => {
         if (lastTxHistory?.periodEnd) {
-            // Handle both string and Timestamp formats for legacy compatibility
             const lastEndDate = typeof lastTxHistory.periodEnd === 'string'
                 ? parseISO(lastTxHistory.periodEnd)
                 : lastTxHistory.periodEnd.toDate();
@@ -117,19 +120,58 @@ export default function AddTransactionModal({ isOpen, onClose }) {
         return manualStart;
     }, [lastTxHistory, manualStart]);
 
-    // Calculate Period End
     const periodEnd = useMemo(() => {
         const start = parseISO(periodStart);
         if (!isValid(start)) return periodStart;
 
-        // Recalculate based on duration change immediately
-        return format(addWeeks(start, parseInt(duration)), "yyyy-MM-dd");
+        // Ensure 7 days per week inclusive: (1 week starts Monday, ends Sunday)
+        // Calculation: duration weeks * 7 days - 1 day offset
+        const daysToAdd = (parseInt(duration) * 7) - 1;
+        return format(addDays(start, daysToAdd), "yyyy-MM-dd");
     }, [periodStart, duration]);
 
+    // Historical Rent Logic
+    const historicalRentData = useMemo(() => {
+        if (!selectedProperty || type !== "RENT") return null;
+
+        const currentPeriodStart = parseISO(periodStart);
+        if (!isValid(currentPeriodStart)) return null;
+
+        const history = [...(selectedProperty.rentHistory || [])];
+        if (history.length === 0) return { amount: selectedProperty.rentAmount, sourceDate: null };
+
+        // Sort by effective date ascending to find the right segment
+        history.sort((a, b) => {
+            const dateA = a.effectiveDate?.toDate ? a.effectiveDate.toDate() : new Date();
+            const dateB = b.effectiveDate?.toDate ? b.effectiveDate.toDate() : new Date();
+            return dateA - dateB;
+        });
+
+        // Find the LATEST entry where effectiveDate <= currentPeriodStart
+        let activeEntry = null;
+        for (const entry of history) {
+            const effDate = entry.effectiveDate?.toDate ? entry.effectiveDate.toDate() : new Date();
+            if (isBefore(effDate, currentPeriodStart) || isSameDay(effDate, currentPeriodStart)) {
+                activeEntry = entry;
+            }
+        }
+
+        if (activeEntry) {
+            return {
+                amount: activeEntry.amount,
+                sourceDate: activeEntry.effectiveDate
+            };
+        }
+
+        // Default to the first history entry if everything is ahead, or the current rentAmount
+        return { amount: history[0].amount, sourceDate: history[0].effectiveDate };
+    }, [selectedProperty, periodStart, type]);
+
+    const activeRentRate = historicalRentData?.amount || selectedProperty?.rentAmount || 0;
+
     const totalAmount = useMemo(() => {
-        if (!selectedProperty) return 0;
-        return (selectedProperty.rentAmount || 0) * parseInt(duration);
-    }, [selectedProperty, duration]);
+        return activeRentRate * parseInt(duration);
+    }, [activeRentRate, duration]);
 
     async function handleSubmit(e) {
         e.preventDefault();
@@ -166,12 +208,13 @@ export default function AddTransactionModal({ isOpen, onClose }) {
                 type,
                 date: Timestamp.fromDate(isValid(settlementDate) ? settlementDate : new Date()),
                 amount: type === "RENT" ? totalAmount : parseFloat(billAmount || 0),
+                utilityType: type === "BILL" ? utilityType : null,
+                rentRate: activeRentRate,
                 notes,
-                status: "PAID",
+                status: status,
                 tenant,
-                // Saving as both for compatibility - User requested "endDate as Timestamps"
-                periodStart: type === "RENT" ? periodStart : null, // keep string for legacy/index compatibility
-                periodEnd: type === "RENT" ? periodEnd : null,   // keep string for logic
+                periodStart: type === "RENT" ? periodStart : null,
+                periodEnd: type === "RENT" ? periodEnd : null,
                 startDate: type === "RENT" && isValid(startD) ? Timestamp.fromDate(startD) : null,
                 endDate: type === "RENT" && isValid(endD) ? Timestamp.fromDate(endD) : null,
                 fileUrl: fileUrl || null,
@@ -200,6 +243,8 @@ export default function AddTransactionModal({ isOpen, onClose }) {
         setNotes("");
         setFile(null);
         setDuration("1");
+        setUtilityType("ELECTRICITY");
+        setStatus("PAID");
         setManualStart(format(new Date(), "yyyy-MM-dd"));
         setTenant("");
         setLastTxHistory(null);
@@ -209,6 +254,12 @@ export default function AddTransactionModal({ isOpen, onClose }) {
         if (!dateStr) return "N/A";
         const parsed = parseISO(dateStr);
         return isValid(parsed) ? format(parsed, formatStr) : "Invalid Date";
+    }
+
+    function formatTs(ts) {
+        if (!ts) return "N/A";
+        const d = ts.toDate ? ts.toDate() : new Date();
+        return format(d, "MMM dd, yyyy");
     }
 
     return (
@@ -317,6 +368,21 @@ export default function AddTransactionModal({ isOpen, onClose }) {
                                                     </div>
                                                 </div>
 
+                                                {/* Historical Rent Feedback */}
+                                                <div className="flex items-start gap-2 bg-slate-950/20 border border-slate-800/50 p-4 rounded-2xl">
+                                                    <HiOutlineInformationCircle className="text-brand text-lg mt-0.5 flex-shrink-0" />
+                                                    <div>
+                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pricing Analysis</p>
+                                                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                                                            {historicalRentData?.sourceDate ? (
+                                                                <>Using historical rent rate of <span className="text-white font-bold">${activeRentRate}</span> active since <span className="text-white font-bold">{formatTs(historicalRentData.sourceDate)}</span>.</>
+                                                            ) : (
+                                                                <>Using current market rate of <span className="text-white font-bold">${activeRentRate}</span> per week.</>
+                                                            )}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
                                                 {/* Summary Box */}
                                                 <div className="bg-slate-950 rounded-[2.5rem] p-8 border border-slate-800 shadow-inner flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative group">
                                                     <div className="absolute top-0 right-0 p-4 opacity-10">
@@ -343,35 +409,68 @@ export default function AddTransactionModal({ isOpen, onClose }) {
 
                                         {/* BILL LOGIC */}
                                         {type === "BILL" && (
-                                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-2">
-                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Bill Amount</label>
-                                                <div className="relative">
-                                                    <HiOutlineCurrencyDollar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-lg" />
-                                                    <input
-                                                        type="number"
-                                                        step="0.01"
-                                                        required
-                                                        className="input-field pl-12"
-                                                        placeholder="0.00"
-                                                        value={billAmount}
-                                                        onChange={(e) => setBillAmount(e.target.value)}
-                                                    />
+                                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                    <div className="space-y-2">
+                                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Utility Category</label>
+                                                        <select
+                                                            className="input-field font-bold"
+                                                            value={utilityType}
+                                                            onChange={(e) => setUtilityType(e.target.value)}
+                                                        >
+                                                            <option value="ELECTRICITY">⚡ Electricity</option>
+                                                            <option value="GAS">🔥 Gas / Heating</option>
+                                                            <option value="WIFI">🌐 Wifi / Internet</option>
+                                                            <option value="WATER">💧 Water</option>
+                                                            <option value="COUNCIL">🏢 Council Rates</option>
+                                                            <option value="OTHER">📦 Other Utility</option>
+                                                        </select>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Invoice Amount</label>
+                                                        <div className="relative">
+                                                            <HiOutlineCurrencyDollar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-lg" />
+                                                            <input
+                                                                type="number"
+                                                                step="0.01"
+                                                                required
+                                                                className="input-field pl-12 font-bold"
+                                                                placeholder="0.00"
+                                                                value={billAmount}
+                                                                onChange={(e) => setBillAmount(e.target.value)}
+                                                            />
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </motion.div>
                                         )}
 
                                         <div className="grid grid-cols-2 gap-6">
                                             <div className="space-y-2">
-                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Payment Date</label>
+                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Filing Date</label>
                                                 <input type="date" className="input-field" value={date} onChange={(e) => setDate(e.target.value)} />
                                             </div>
                                             <div className="space-y-2">
-                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Documentation</label>
+                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Settlement Status</label>
+                                                <select
+                                                    className="input-field font-black uppercase tracking-widest text-[10px]"
+                                                    value={status}
+                                                    onChange={(e) => setStatus(e.target.value)}
+                                                >
+                                                    <option value="PAID" className="text-success">✅ SETTLED / PAID</option>
+                                                    <option value="UNPAID" className="text-danger">❌ UNPAID / PENDING</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 gap-6">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Audit Documentation</label>
                                                 <div className="relative group">
                                                     <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={(e) => setFile(e.target.files[0])} />
                                                     <div className="input-field flex items-center gap-3 overflow-hidden">
                                                         <HiOutlineUpload className="text-slate-500 flex-shrink-0" />
-                                                        <span className="text-xs text-slate-400 truncate">{file ? file.name : "Attach Receipt"}</span>
+                                                        <span className="text-xs text-slate-400 truncate">{file ? file.name : "Attach Invoice / Receipt"}</span>
                                                     </div>
                                                 </div>
                                             </div>
