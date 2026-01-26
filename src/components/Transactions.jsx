@@ -5,11 +5,12 @@ import TransactionList from "./TransactionList";
 import TransactionDetailModal from "./TransactionDetailModal";
 import EditTransactionModal from "./EditTransactionModal";
 import ExportMenu from "./ExportMenu";
+import ImportModal from "./ImportModal";
 import { db, auth } from "../firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, query, where, orderBy, onSnapshot, deleteDoc, doc, getDocs } from "firebase/firestore";
 import { format, isWithinInterval, startOfDay, endOfDay, parseISO, isValid } from "date-fns";
-import { HiOutlineSearch, HiOutlineFilter, HiOutlineCollection, HiOutlineX, HiOutlineDocumentDownload } from "react-icons/hi";
+import { HiOutlineSearch, HiOutlineFilter, HiOutlineCollection, HiOutlineX, HiOutlineDocumentDownload, HiOutlineDownload } from "react-icons/hi";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -30,6 +31,7 @@ export default function Transactions() {
     // PDF Export States
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
+    const [isImportOpen, setIsImportOpen] = useState(false);
     const [exportEntityName, setExportEntityName] = useState("");
     const [exportOptions, setExportOptions] = useState({
         showNotes: true,
@@ -327,12 +329,20 @@ export default function Transactions() {
                             data={filteredTransactions}
                             onExportPDF={() => setIsProfileModalOpen(true)}
                         />
-                        <button
-                            onClick={clearFilters}
-                            className="w-full sm:w-auto px-6 py-4 bg-slate-800 text-slate-300 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border border-slate-700 hover:border-slate-500 flex items-center justify-center gap-2"
-                        >
-                            <HiOutlineX /> Reset
-                        </button>
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                            <button
+                                onClick={() => setIsImportOpen(true)}
+                                className="flex-1 sm:flex-none px-6 py-4 bg-emerald-600/10 text-emerald-500 hover:bg-emerald-600 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border border-emerald-600/20 flex items-center justify-center gap-2"
+                            >
+                                <HiOutlineDownload className="rotate-180" /> Import
+                            </button>
+                            <button
+                                onClick={clearFilters}
+                                className="flex-1 sm:flex-none px-6 py-4 bg-slate-800 text-slate-300 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border border-slate-700 hover:border-slate-500 flex items-center justify-center gap-2"
+                            >
+                                <HiOutlineX /> Reset
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -460,6 +470,14 @@ export default function Transactions() {
                 isOpen={isEditOpen}
                 onClose={() => setIsEditOpen(false)}
                 transaction={editingTransaction}
+            />
+
+            {/* Import Modal */}
+            <ImportModal
+                isOpen={isImportOpen}
+                onClose={() => setIsImportOpen(false)}
+                user={user}
+                properties={properties}
             />
 
             {/* Profile Selection Modal */}
