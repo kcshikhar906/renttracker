@@ -1,0 +1,12 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /transactions/{transactionId} {
+      // Allow read/update/delete only if user owns the document
+      allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.uid;
+      
+      // Allow create only if user is authenticated and sets themselves as the owner
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;
+    }
+  }
+}

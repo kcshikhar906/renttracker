@@ -31,15 +31,21 @@ export default function AddTransactionForm() {
                 fileUrl = await getDownloadURL(uploadResult.ref);
             }
 
-            await addDoc(collection(db, "transactions"), {
+            const transactionData = {
                 uid: currentUser.uid,
                 type,
                 date,
                 amount: parseFloat(amount),
                 notes,
-                fileUrl,
                 createdAt: serverTimestamp(),
-            });
+            };
+
+            if (fileUrl) {
+                transactionData.fileUrl = fileUrl;
+            }
+
+            await addDoc(collection(db, "transactions"), transactionData);
+
 
             // Reset form
             setType("RENT");
@@ -67,8 +73,8 @@ export default function AddTransactionForm() {
                         type="button"
                         onClick={() => setType("RENT")}
                         className={`flex-1 py-2 px-4 rounded-lg font-semibold transition-all ${type === "RENT"
-                                ? "bg-indigo-600 text-white shadow-lg"
-                                : "text-slate-400 hover:text-slate-200"
+                            ? "bg-indigo-600 text-white shadow-lg"
+                            : "text-slate-400 hover:text-slate-200"
                             }`}
                     >
                         RENT
@@ -77,8 +83,8 @@ export default function AddTransactionForm() {
                         type="button"
                         onClick={() => setType("BILL")}
                         className={`flex-1 py-2 px-4 rounded-lg font-semibold transition-all ${type === "BILL"
-                                ? "bg-purple-600 text-white shadow-lg"
-                                : "text-slate-400 hover:text-slate-200"
+                            ? "bg-purple-600 text-white shadow-lg"
+                            : "text-slate-400 hover:text-slate-200"
                             }`}
                     >
                         BILL
