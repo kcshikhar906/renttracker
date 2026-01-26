@@ -1,57 +1,54 @@
 import React, { useEffect, useState } from "react";
-import Navbar from "./Navbar";
-import AddTransactionForm from "./AddTransactionForm";
+import Layout from "./Layout";
 import TransactionList from "./TransactionList";
-import { motion, AnimatePresence } from "framer-motion";
-import { db } from "../firebase";
-import { useAuth } from "../contexts/AuthContext";
+import { db, auth } from "../firebase";
+import { onAuthStateChanged } from "firebase/auth";
 import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
-import { TrendingUp, CreditCard, Wallet } from "lucide-react";
+import { motion } from "framer-motion";
+import { HiOutlineTrendingUp, HiOutlineCreditCard, HiOutlineLightningBolt } from "react-icons/hi";
 
-const SummaryCard = ({ title, amount, type, icon: Icon }) => {
-    const isRent = type === "RENT";
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`card relative overflow-hidden flex flex-col justify-between group h-full`}
-        >
-            <div className={`absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity`}>
-                <Icon size={80} />
+const StatCard = ({ title, amount, icon: Icon, colorClass }) => (
+    <div className="stats-card">
+        <div className="flex items-center justify-between mb-4">
+            <div className={`p-2.5 rounded-xl bg-slate-950 border border-slate-800 ${colorClass}`}>
+                <Icon className="text-xl" />
             </div>
-            <div>
-                <p className="text-slate-400 font-medium mb-1">{title}</p>
-                <h3 className={`text-4xl font-bold tracking-tight ${isRent ? "text-emerald-400" : "text-orange-400"}`}>
-                    ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </h3>
-            </div>
-            <div className="mt-4 flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${isRent ? "bg-emerald-500" : "bg-orange-500"} animate-pulse`}></div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Live Balance</span>
-            </div>
-
-            {/* Visual background gradient accent */}
-            <div className={`absolute inset-0 bg-gradient-to-br ${isRent ? "from-emerald-500/5 to-transparent" : "from-orange-500/5 to-transparent"} pointer-events-none`}></div>
-        </motion.div>
-    );
-};
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Global</span>
+        </div>
+        <p className="text-slate-500 text-sm font-medium">{title}</p>
+        <h3 className="text-2xl font-bold text-slate-100 mt-1">
+            ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </h3>
+    </div>
+);
 
 export default function Dashboard() {
-    const { currentUser } = useAuth();
     const [transactions, setTransactions] = useState([]);
     const [totals, setTotals] = useState({ rent: 0, bills: 0 });
     const [loading, setLoading] = useState(true);
+    const [user, setUser] = useState(null);
 
     useEffect(() => {
-        if (!currentUser) return;
+        // Critical Fix: Only fetch data once user is authenticated
+        const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser);
+            if (!currentUser) {
+                setLoading(false);
+            }
+        });
+        return () => unsubscribeAuth();
+    }, []);
+
+    useEffect(() => {
+        if (!user) return;
 
         const q = query(
             collection(db, "transactions"),
-            where("uid", "==", currentUser.uid),
+            where("uid", "==", user.uid),
             orderBy("date", "desc")
         );
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
+        const unsubscribeData = onSnapshot(q, (snapshot) => {
             const data = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
@@ -69,57 +66,69 @@ export default function Dashboard() {
             setTotals({ rent: rentTotal, bills: billsTotal });
             setLoading(false);
         }, (err) => {
-            console.error("Dashboard data fetch error:", err);
+            console.error("Firestore error:", err);
             setLoading(false);
         });
 
-        return unsubscribe;
-    }, [currentUser]);
+        return () => unsubscribeData();
+    }, [user]);
+
+    if (loading && !user) {
+        return (
+            <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="w-12 h-12 border-4 border-brand/20 border-t-brand rounded-full animate-spin"></div>
+                    <p className="text-slate-500 font-medium animate-pulse text-sm uppercase tracking-widest">Initializing Session</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
-        <div className="min-h-screen">
-            <Navbar />
-            <main className="max-w-6xl mx-auto px-4 py-8 md:py-12">
-                {/* Summary Section */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-                    <SummaryCard
+        <Layout>
+            <div className="space-y-8 max-w-7xl mx-auto">
+                {/* Welcome Section */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h2 className="text-3xl font-bold text-slate-100 tracking-tight">Overview</h2>
+                        <p className="text-slate-500 mt-1">Snapshot of your spending and rental obligations.</p>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase bg-slate-900 border border-slate-800 px-4 py-2 rounded-xl">
+                        <span className="w-2 h-2 rounded-full bg-success animate-pulse"></span>
+                        Real-time Monitoring
+                    </div>
+                </div>
+
+                {/* Stats Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                    <StatCard
                         title="Total Rent Paid"
                         amount={totals.rent}
-                        type="RENT"
-                        icon={TrendingUp}
+                        icon={HiOutlineTrendingUp}
+                        colorClass="text-brand"
                     />
-                    <SummaryCard
+                    <StatCard
                         title="Total Bills Paid"
                         amount={totals.bills}
-                        type="BILL"
-                        icon={CreditCard}
+                        icon={HiOutlineCreditCard}
+                        colorClass="text-warning"
+                    />
+                    <StatCard
+                        title="Combined Expenses"
+                        amount={totals.rent + totals.bills}
+                        icon={HiOutlineLightningBolt}
+                        colorClass="text-success"
                     />
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-                    {/* Left Column - Add Transaction */}
-                    <div className="lg:col-span-12 xl:col-span-5 order-2 xl:order-1">
-                        <div className="xl:sticky xl:top-28">
-                            <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
-                                <span className="w-1.5 h-8 bg-indigo-500 rounded-full"></span>
-                                New Transaction
-                            </h2>
-                            <AddTransactionForm />
-                        </div>
+                {/* Recent Transactions */}
+                <section>
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-lg font-bold text-slate-100">Transaction History</h3>
                     </div>
-
-                    {/* Right Column - History */}
-                    <div className="lg:col-span-12 xl:col-span-7 order-1 xl:order-2">
-                        <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
-                            <span className="w-1.5 h-8 bg-purple-500 rounded-full"></span>
-                            Recent History
-                        </h2>
-                        <div className="max-h-[800px] overflow-y-auto pr-2 custom-scrollbar">
-                            <TransactionList transactions={transactions} loading={loading} />
-                        </div>
-                    </div>
-                </div>
-            </main>
-        </div>
+                    <TransactionList transactions={transactions} loading={loading} />
+                </section>
+            </div>
+        </Layout>
     );
 }

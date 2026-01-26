@@ -1,122 +1,158 @@
 import React from "react";
 import { db } from "../firebase";
 import { doc, deleteDoc } from "firebase/firestore";
-import { Receipt, Calendar, Info, Trash2, ExternalLink, Home } from "lucide-react";
+import {
+    HiOutlineTrash,
+    HiOutlineExternalLink,
+    HiOutlineCollection,
+    HiOutlineInbox,
+    HiOutlineArchive
+} from "react-icons/hi";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function TransactionList({ transactions, loading }) {
 
     async function handleDelete(id) {
-        if (window.confirm("Are you sure you want to delete this transaction? This action cannot be undone.")) {
+        if (window.confirm("Are you sure you want to delete this record? This cannot be undone.")) {
             try {
                 await deleteDoc(doc(db, "transactions", id));
             } catch (err) {
-                console.error("Error deleting document: ", err);
-                alert("Failed to delete transaction.");
+                console.error("Deletion failed:", err);
             }
         }
     }
 
     if (loading) {
         return (
-            <div className="flex flex-col items-center justify-center py-20 space-y-4">
-                <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
-                <p className="text-slate-400 font-medium">Loading history...</p>
+            <div className="py-20 flex flex-col items-center gap-4">
+                <div className="w-10 h-10 border-4 border-slate-800 border-t-brand rounded-full animate-spin"></div>
+                <p className="text-slate-500 text-sm font-bold uppercase tracking-widest">Updating Ledger</p>
             </div>
         );
     }
 
     if (transactions.length === 0) {
         return (
-            <div className="card text-center py-16">
-                <div className="inline-flex p-4 bg-slate-800/50 rounded-2xl mb-4">
-                    <Info className="w-8 h-8 text-slate-500" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">No Transactions Yet</h3>
-                <p className="text-slate-400 max-w-xs mx-auto">
-                    Add your first rent or bill payment to keep track of your expenses.
+            <div className="bg-slate-900 border border-slate-800 border-dashed rounded-3xl py-20 flex flex-col items-center text-center">
+                <HiOutlineArchive className="text-5xl text-slate-700 mb-4" />
+                <h4 className="text-lg font-bold text-slate-300">No records found</h4>
+                <p className="text-slate-500 text-sm max-w-xs mx-auto mt-2">
+                    Your transaction ledger is currently empty. Start by adding a new record.
                 </p>
             </div>
         );
     }
 
     return (
-        <div className="space-y-4 pb-8">
-            <AnimatePresence mode="popLayout">
-                {transactions.map((t, index) => {
-                    const isRent = t.type === "RENT";
-                    return (
-                        <motion.div
-                            key={t.id}
-                            layout
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            transition={{ duration: 0.2 }}
-                            className="group relative"
-                        >
-                            <div className="card !p-5 group-hover:bg-white/5 transition-all duration-300">
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                    <div className="flex items-center gap-4">
-                                        <div className={`p-3 rounded-2xl ${isRent ? "bg-emerald-500/10 text-emerald-400" : "bg-orange-500/10 text-orange-400"
-                                            }`}>
-                                            {isRent ? <Home className="w-6 h-6" /> : <Receipt className="w-6 h-6" />}
-                                        </div>
-                                        <div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-bold text-xl text-white">
-                                                    ${t.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                                </span>
-                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${isRent ? "bg-emerald-500/20 text-emerald-400" : "bg-orange-500/20 text-orange-400"
-                                                    }`}>
-                                                    {t.type}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-3 text-sm text-slate-400 mt-1">
-                                                <div className="flex items-center gap-1">
-                                                    <Calendar className="w-3 h-3" />
-                                                    {new Date(t.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center gap-2 sm:self-center">
+        <div className="space-y-4">
+            {/* Desktop View: Table */}
+            <div className="hidden lg:block overflow-hidden bg-slate-900 border border-slate-800 rounded-2xl">
+                <table className="w-full text-left border-collapse">
+                    <thead>
+                        <tr className="bg-slate-950/50 text-slate-500 uppercase text-[10px] font-bold tracking-widest border-b border-slate-800">
+                            <th className="px-6 py-4">Status</th>
+                            <th className="px-6 py-4">Category</th>
+                            <th className="px-6 py-4">Date</th>
+                            <th className="px-6 py-4">Notes</th>
+                            <th className="px-6 py-4">Amount</th>
+                            <th className="px-6 py-4 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                        {transactions.map((t) => (
+                            <tr key={t.id} className="hover:bg-white/[0.02] transition-colors group">
+                                <td className="px-6 py-4">
+                                    <span className="flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-success"></span>
+                                        <span className="text-xs font-medium text-slate-400">Settled</span>
+                                    </span>
+                                </td>
+                                <td className="px-6 py-4">
+                                    <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-tighter ${t.type === "RENT" ? "bg-brand/10 text-brand border border-brand/20" : "bg-warning/10 text-warning border border-warning/20"
+                                        }`}>
+                                        {t.type}
+                                    </span>
+                                </td>
+                                <td className="px-6 py-4 text-sm text-slate-400 font-medium">
+                                    {new Date(t.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </td>
+                                <td className="px-6 py-4 text-sm text-slate-500 max-w-xs truncate italic">
+                                    {t.notes || "—"}
+                                </td>
+                                <td className="px-6 py-4 font-bold text-slate-200">
+                                    ${t.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                    <div className="flex items-center justify-end gap-2">
                                         {t.fileUrl && (
                                             <a
                                                 href={t.fileUrl}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="flex items-center gap-2 px-3 py-2 bg-slate-800/50 hover:bg-slate-700 rounded-xl text-xs font-medium text-slate-300 transition-all border border-slate-700/50"
+                                                className="p-2 text-slate-500 hover:text-brand transition-colors bg-slate-950 rounded-lg border border-slate-800 hover:border-brand/40"
+                                                title="View Receipt"
                                             >
-                                                <ExternalLink className="w-3.5 h-3.5" />
-                                                View Proof
+                                                <HiOutlineExternalLink className="text-lg" />
                                             </a>
                                         )}
                                         <button
                                             onClick={() => handleDelete(t.id)}
-                                            className="p-2.5 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white rounded-xl transition-all duration-200 border border-red-500/20"
-                                            title="Delete Transaction"
+                                            className="p-2 text-slate-500 hover:text-danger transition-colors bg-slate-950 rounded-lg border border-slate-800 hover:border-danger/40"
+                                            title="Delete Record"
                                         >
-                                            <Trash2 className="w-4 h-4" />
+                                            <HiOutlineTrash className="text-lg" />
                                         </button>
                                     </div>
-                                </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
 
-                                {t.notes && (
-                                    <div className="mt-4 pt-4 border-t border-white/5">
-                                        <p className="text-sm text-slate-400 italic">"{t.notes}"</p>
-                                    </div>
-                                )}
+            {/* Mobile/Tablet View: Cards */}
+            <div className="lg:hidden space-y-4">
+                {transactions.map((t) => (
+                    <motion.div
+                        key={t.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="stats-card relative overflow-hidden"
+                    >
+                        <div className={`absolute top-0 left-0 w-1.5 h-full ${t.type === "RENT" ? "bg-brand" : "bg-warning"}`}></div>
+                        <div className="flex justify-between items-start mb-4">
+                            <div className="flex flex-col gap-1">
+                                <span className={`text-[9px] font-bold uppercase tracking-widest ${t.type === "RENT" ? "text-brand" : "text-warning"}`}>
+                                    {t.type}
+                                </span>
+                                <span className="text-lg font-bold text-slate-100 italic">
+                                    {new Date(t.date).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}
+                                </span>
                             </div>
-
-                            {/* Accent Line */}
-                            <div className={`absolute left-0 top-6 bottom-6 w-1 rounded-r-full ${isRent ? "bg-emerald-500" : "bg-orange-500"
-                                } opacity-60`}></div>
-                        </motion.div>
-                    );
-                })}
-            </AnimatePresence>
+                            <div className="text-right">
+                                <p className="text-xl font-black text-white leading-none">
+                                    ${t.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </p>
+                                <div className="flex items-center gap-2 mt-2 justify-end">
+                                    {t.fileUrl && (
+                                        <a href={t.fileUrl} target="_blank" rel="noopener noreferrer" className="text-slate-500 active:text-brand">
+                                            <HiOutlineExternalLink className="text-xl" />
+                                        </a>
+                                    )}
+                                    <button onClick={() => handleDelete(t.id)} className="text-slate-500 active:text-danger">
+                                        <HiOutlineTrash className="text-xl" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        {t.notes && (
+                            <p className="text-xs text-slate-500 italic mt-2 line-clamp-2 border-t border-slate-800 pt-3">
+                                "{t.notes}"
+                            </p>
+                        )}
+                    </motion.div>
+                ))}
+            </div>
         </div>
     );
 }

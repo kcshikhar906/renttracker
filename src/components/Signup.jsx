@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { motion } from "framer-motion";
-import { UserPlus, Mail, Lock, AlertCircle } from "lucide-react";
+import { HiOutlineUserAdd, HiOutlineMail, HiOutlineLockClosed, HiOutlineExclamationCircle } from "react-icons/hi";
 
 export default function Signup() {
     const [email, setEmail] = useState("");
@@ -17,7 +17,7 @@ export default function Signup() {
         e.preventDefault();
 
         if (password !== confirmPassword) {
-            return setError("Passwords do not match");
+            return setError("Security keys do not match.");
         }
 
         try {
@@ -26,7 +26,7 @@ export default function Signup() {
             await signup(email, password);
             navigate("/");
         } catch (err) {
-            setError("Failed to create an account. " + err.message);
+            setError("Account provisioning failed. " + err.message);
             console.error(err);
         } finally {
             setLoading(false);
@@ -34,37 +34,37 @@ export default function Signup() {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="min-h-screen flex items-center justify-center p-4 bg-slate-950">
             <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
+                initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="card w-full max-w-md"
+                className="bg-slate-900 border border-slate-800 p-8 md:p-10 rounded-3xl w-full max-w-md shadow-2xl"
             >
-                <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center p-3 bg-indigo-500/20 rounded-2xl mb-4">
-                        <UserPlus className="w-8 h-8 text-indigo-400" />
+                <div className="text-center mb-10">
+                    <div className="w-16 h-16 bg-brand rounded-2xl flex items-center justify-center shadow-lg shadow-brand/20 mx-auto mb-6">
+                        <HiOutlineUserAdd className="text-3xl text-white" />
                     </div>
-                    <h1 className="text-3xl font-bold">Create Account</h1>
-                    <p className="text-slate-400 mt-2">Start tracking your expenses today</p>
+                    <h1 className="text-3xl font-bold text-slate-100 tracking-tight">Provision Account</h1>
+                    <p className="text-slate-500 mt-2 font-medium">Initialize your financial environment</p>
                 </div>
 
                 {error && (
-                    <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-4 rounded-xl mb-6 flex items-center gap-3">
-                        <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                        <span className="text-sm font-medium">{error}</span>
+                    <div className="bg-danger/10 border border-danger/20 text-danger p-4 rounded-xl mb-6 flex items-center gap-3">
+                        <HiOutlineExclamationCircle className="text-xl flex-shrink-0" />
+                        <span className="text-sm font-semibold tracking-tight">{error}</span>
                     </div>
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-5">
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-300 ml-1">Email Address</label>
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest px-1">Email Identifier</label>
                         <div className="relative">
-                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                            <HiOutlineMail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-lg" />
                             <input
                                 type="email"
                                 required
                                 className="input-field pl-12"
-                                placeholder="name@example.com"
+                                placeholder="corporate@domain.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                             />
@@ -72,9 +72,9 @@ export default function Signup() {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-300 ml-1">Password</label>
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest px-1">Security Key</label>
                         <div className="relative">
-                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                            <HiOutlineLockClosed className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-lg" />
                             <input
                                 type="password"
                                 required
@@ -87,9 +87,9 @@ export default function Signup() {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-300 ml-1">Confirm Password</label>
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest px-1">Verify Security Key</label>
                         <div className="relative">
-                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                            <HiOutlineLockClosed className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-lg" />
                             <input
                                 type="password"
                                 required
@@ -104,17 +104,17 @@ export default function Signup() {
                     <button
                         disabled={loading}
                         type="submit"
-                        className="btn-primary w-full mt-4"
+                        className="btn-primary w-full py-4 uppercase tracking-widest font-bold text-sm mt-4"
                     >
-                        {loading ? "Creating Account..." : "Sign Up"}
+                        {loading ? "Provisioning..." : "Initialize Account"}
                     </button>
                 </form>
 
-                <div className="mt-8 pt-6 border-t border-slate-700/50 text-center">
-                    <p className="text-slate-400">
-                        Already have an account?{" "}
-                        <Link to="/login" className="text-indigo-400 hover:text-indigo-300 font-semibold transition-colors">
-                            Log In
+                <div className="mt-10 pt-8 border-t border-slate-800 text-center">
+                    <p className="text-slate-500 text-sm font-medium">
+                        Existing user?{" "}
+                        <Link to="/login" className="text-brand hover:text-brand/80 font-bold transition-colors">
+                            Authorize Access
                         </Link>
                     </p>
                 </div>
