@@ -5,11 +5,14 @@ import {
     HiOutlineOfficeBuilding,
     HiOutlineUserCircle,
     HiOutlineCalendar,
-    HiOutlineClock
+    HiOutlineClock,
+    HiOutlinePaperClip,
+    HiOutlineTrash,
+    HiOutlinePencilAlt
 } from "react-icons/hi";
 import { format, isValid, parseISO, differenceInDays } from "date-fns";
 
-export default function TransactionList({ transactions, loading, onSelect }) {
+export default function TransactionList({ transactions, loading, onSelect, onEdit, onDelete }) {
 
     const safeFormat = (dateData, formatStr) => {
         if (!dateData) return "—";
@@ -49,7 +52,7 @@ export default function TransactionList({ transactions, loading, onSelect }) {
                         <th className="px-5 py-2">Settled By</th>
                         <th className="px-5 py-2">Amount</th>
                         <th className="px-5 py-2">Status</th>
-                        <th className="px-5 py-2 text-right">Audit</th>
+                        <th className="px-5 py-2 text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-transparent">
@@ -59,11 +62,14 @@ export default function TransactionList({ transactions, loading, onSelect }) {
                             onClick={() => onSelect(t)}
                             className="bg-slate-950/40 hover:bg-slate-800/40 transition-all cursor-pointer group rounded-xl"
                         >
-                            <td className="px-5 py-3 first:rounded-l-2xl">
-                                <div className="flex flex-col">
-                                    <span className="text-xs font-bold text-slate-200">
-                                        {safeFormat(t.date, "MMM dd, yyyy")}
-                                    </span>
+                            <td className="px-5 py-3 first:rounded-l-2xl cursor-pointer" onClick={(e) => { e.stopPropagation(); onEdit(t); }}>
+                                <div className="flex flex-col group/date">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold text-slate-200">
+                                            {safeFormat(t.date, "MMM dd, yyyy")}
+                                        </span>
+                                        <HiOutlinePencilAlt className="text-[10px] text-slate-600 opacity-0 group-hover/date:opacity-100 transition-opacity" />
+                                    </div>
                                     {t.createdAt && (
                                         <span className="text-[9px] font-medium text-slate-500 mt-0.5 uppercase tracking-tighter">
                                             Added: {safeFormat(t.createdAt, "hh:mm a")}
@@ -72,23 +78,25 @@ export default function TransactionList({ transactions, loading, onSelect }) {
                                 </div>
                             </td>
 
-                            <td className="px-5 py-3">
-                                <div className="flex items-center gap-2">
+                            <td className="px-5 py-3 cursor-pointer" onClick={(e) => { e.stopPropagation(); onEdit(t); }}>
+                                <div className="flex items-center gap-2 group/asset">
                                     <HiOutlineOfficeBuilding className="text-slate-600 text-sm" />
-                                    <span className="text-xs font-bold text-slate-400 group-hover:text-white transition-colors">
+                                    <span className="text-xs font-bold text-slate-400 group-hover/asset:text-white transition-colors">
                                         {t.propertyName || "Other"}
                                     </span>
+                                    <HiOutlinePencilAlt className="text-[10px] text-slate-600 opacity-0 group-hover/asset:opacity-100 transition-opacity" />
                                 </div>
                             </td>
 
-                            <td className="px-5 py-3">
+                            <td className="px-5 py-3 cursor-pointer" onClick={(e) => { e.stopPropagation(); onEdit(t); }}>
                                 {t.type === "RENT" ? (
-                                    <div className="flex flex-col">
+                                    <div className="flex flex-col group/period">
                                         <div className="flex items-center gap-2">
                                             <HiOutlineClock className="text-slate-650 text-xs" />
-                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">
+                                            <span className="text-[10px] font-black text-success uppercase tracking-tighter">
                                                 {safeFormat(t.periodStart, "MMM dd")} - {safeFormat(t.periodEnd, "MMM dd")}
                                             </span>
+                                            <HiOutlinePencilAlt className="text-[10px] text-slate-600 opacity-0 group-hover/period:opacity-100 transition-opacity" />
                                         </div>
                                         {t.periodStart && t.periodEnd && (
                                             <span className="text-[9px] font-bold text-slate-600 uppercase mt-0.5 pl-5">
@@ -105,49 +113,88 @@ export default function TransactionList({ transactions, loading, onSelect }) {
                                         )}
                                     </div>
                                 ) : (
-                                    <div className="flex flex-col">
+                                    <div className="flex flex-col group/utility">
                                         <div className="flex items-center gap-2">
                                             <span className="text-[10px] font-black text-warning uppercase bg-warning/10 border border-warning/20 px-2 py-0.5 rounded-full">
                                                 {t.utilityType || "Utility"}
                                             </span>
+                                            <HiOutlinePencilAlt className="text-[10px] text-slate-600 opacity-0 group-hover/utility:opacity-100 transition-opacity" />
                                         </div>
                                         <span className="text-[9px] font-bold text-slate-600 uppercase mt-1 pl-1">Standard Billing</span>
                                     </div>
                                 )}
                             </td>
 
-                            <td className="px-5 py-3">
-                                <div className="flex items-center gap-2">
+                            <td className="px-5 py-3 cursor-pointer" onClick={(e) => { e.stopPropagation(); onEdit(t); }}>
+                                <div className="flex items-center gap-2 group/tenant">
                                     <HiOutlineUserCircle className="text-slate-600" />
-                                    <span className="text-xs font-medium text-slate-400">
+                                    <span className="text-xs font-medium text-slate-400 group-hover/tenant:text-white transition-colors">
                                         {t.tenant || "System"}
                                     </span>
+                                    <HiOutlinePencilAlt className="text-[10px] text-slate-600 opacity-0 group-hover/tenant:opacity-100 transition-opacity" />
                                 </div>
                             </td>
 
-                            <td className="px-5 py-3">
-                                <span className="text-sm font-black text-white">
-                                    ${t.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                </span>
+                            <td className="px-5 py-3 cursor-pointer" onClick={(e) => { e.stopPropagation(); onEdit(t); }}>
+                                <div className="flex items-center gap-2 group/amount">
+                                    <span className="text-sm font-black text-white">
+                                        ${t.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    </span>
+                                    <HiOutlinePencilAlt className="text-[10px] text-slate-600 opacity-0 group-hover/amount:opacity-100 transition-opacity" />
+                                </div>
                             </td>
 
-                            <td className="px-5 py-3">
-                                <div className="flex items-center gap-2">
-                                    <div className={`w-1.5 h-1.5 rounded-full ${t.status === 'PAID' ? 'bg-success shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-warning'}`}></div>
-                                    <span className={`text-[9px] font-black uppercase tracking-widest ${t.status === 'PAID' ? 'text-success' : 'text-warning'}`}>
+                            <td className="px-5 py-3 cursor-pointer" onClick={(e) => { e.stopPropagation(); onEdit(t); }}>
+                                <div className="flex items-center gap-2 group/status">
+                                    <div className={`w-1.5 h-1.5 rounded-full ${t.status === 'PAID' ? 'bg-success shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-danger shadow-[0_0_8px_rgba(239,68,68,0.4)]'}`}></div>
+                                    <span className={`text-[9px] font-black uppercase tracking-widest ${t.status === 'PAID' ? 'text-success' : 'text-danger'}`}>
                                         {t.status || "Pending"}
                                     </span>
+                                    <HiOutlinePencilAlt className="text-[10px] text-slate-600 opacity-0 group-hover/status:opacity-100 transition-opacity" />
                                 </div>
                             </td>
 
                             <td className="px-5 py-3 text-right last:rounded-r-2xl">
-                                <button
-                                    className="p-2 bg-slate-900 border border-slate-800 text-slate-500 rounded-xl group-hover:bg-brand group-hover:text-white group-hover:border-brand/50 transition-all shadow-sm"
-                                    title="View Statement"
-                                >
-                                    <HiOutlineEye className="text-lg" />
-                                </button>
+                                <div className="flex items-center justify-end gap-2">
+                                    {t.fileUrl && (
+                                        <a
+                                            href={t.fileUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="p-2 bg-slate-900 border border-slate-800 text-brand rounded-xl hover:bg-brand hover:text-white transition-all shadow-sm flex items-center gap-1 group/proof"
+                                            title="View Proof"
+                                        >
+                                            <span className="text-[10px] font-black uppercase hidden group-hover/proof:block ml-1">View Proof</span>
+                                            <HiOutlinePaperClip className="text-lg" />
+                                        </a>
+                                    )}
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onEdit(t); }}
+                                        className="p-2 bg-slate-900 border border-slate-800 text-slate-500 rounded-xl hover:bg-warning hover:text-white hover:border-warning/50 transition-all shadow-sm"
+                                        title="Quick Edit"
+                                    >
+                                        <HiOutlinePencilAlt className="text-lg" />
+                                    </button>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onSelect(t); }}
+                                        className="p-2 bg-slate-900 border border-slate-800 text-slate-500 rounded-xl hover:bg-brand hover:text-white hover:border-brand/50 transition-all shadow-sm"
+                                        title="View Statement"
+                                    >
+                                        <HiOutlineEye className="text-lg" />
+                                    </button>
+                                    {onDelete && (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); onDelete(t.id); }}
+                                            className="p-2 bg-slate-900 border border-slate-800 text-slate-500 rounded-xl hover:bg-danger hover:text-white hover:border-danger/50 transition-all shadow-sm"
+                                            title="Delete Record"
+                                        >
+                                            <HiOutlineTrash className="text-lg" />
+                                        </button>
+                                    )}
+                                </div>
                             </td>
+
                         </tr>
                     ))}
                 </tbody>

@@ -30,12 +30,14 @@ import { format, parseISO, isValid } from "date-fns";
 export default function Settings() {
     const { currentUser } = useAuth();
     const [properties, setProperties] = useState([]);
+    const [reportProfiles, setReportProfiles] = useState([]);
     const [loading, setLoading] = useState(true);
 
     // Property Form State
     const [showAddForm, setShowAddForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [tenantInput, setTenantInput] = useState("");
+    const [profileInput, setProfileInput] = useState("");
     const [formData, setFormData] = useState({
         name: "",
         rentAmount: "",
@@ -47,22 +49,46 @@ export default function Settings() {
     useEffect(() => {
         if (!currentUser) return;
 
-        const q = query(
-            collection(db, "properties"),
-            where("uid", "==", currentUser.uid)
-        );
+        const qProps = query(collection(db, "properties"), where("uid", "==", currentUser.uid));
+        const qProfs = query(collection(db, "profiles"), where("uid", "==", currentUser.uid));
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const data = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
-            setProperties(data);
+        const unsubProps = onSnapshot(qProps, (snapshot) => {
+            setProperties(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        });
+
+        const unsubProfs = onSnapshot(qProfs, (snapshot) => {
+            setReportProfiles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             setLoading(false);
         });
 
-        return unsubscribe;
+        return () => {
+            unsubProps();
+            unsubProfs();
+        };
     }, [currentUser]);
+
+    const handleAddProfile = async () => {
+        if (!profileInput.trim()) return;
+        try {
+            await addDoc(collection(db, "profiles"), {
+                uid: currentUser.uid,
+                name: profileInput.trim(),
+                createdAt: Timestamp.now()
+            });
+            setProfileInput("");
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const handleDeleteProfile = async (id) => {
+        if (!window.confirm("Remove this report profile?")) return;
+        try {
+            await deleteDoc(doc(db, "profiles", id));
+        } catch (err) {
+            console.error(err);
+        }
+    };
 
     const addTenant = () => {
         if (!tenantInput.trim()) return;
@@ -344,6 +370,44 @@ export default function Settings() {
                     )}
                 </AnimatePresence>
 
+                {/* Report Profiles Section */}
+                <div className="stats-card p-8 border-slate-800 bg-slate-900/40">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+                        <div>
+                            <h3 className="text-xl font-bold text-white tracking-tight">Report Profiles</h3>
+                            <p className="text-xs text-slate-500 mt-1 uppercase tracking-widest font-black">Authorized Audit Entity Names</p>
+                        </div>
+                        <div className="flex gap-2 w-full md:w-auto">
+                            <input
+                                className="input-field py-3 flex-1 md:w-64"
+                                placeholder="e.g. Shikhar's Rental Profile"
+                                value={profileInput}
+                                onChange={e => setProfileInput(e.target.value)}
+                                onKeyPress={e => e.key === 'Enter' && (e.preventDefault(), handleAddProfile())}
+                            />
+                            <button onClick={handleAddProfile} className="p-3 bg-brand text-white rounded-2xl hover:scale-105 transition-all">
+                                <HiOutlinePlus className="text-xl" />
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-4">
+                        {reportProfiles.length === 0 && (
+                            <div className="w-full py-8 text-center text-slate-600 italic text-sm border-2 border-dashed border-slate-800 rounded-3xl">
+                                No report profiles added. Add a name to enable branded PDF exports.
+                            </div>
+                        )}
+                        {reportProfiles.map(prof => (
+                            <div key={prof.id} className="flex items-center gap-3 bg-slate-950 border border-slate-800 px-5 py-3 rounded-2xl group hover:border-brand/40 transition-all">
+                                <span className="text-sm font-bold text-slate-300">{prof.name}</span>
+                                <button onClick={() => handleDeleteProfile(prof.id)} className="p-1.5 text-slate-600 hover:text-danger rounded-lg">
+                                    <HiOutlineTrash />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {properties.length === 0 && !loading && (
                         <div className="col-span-full py-32 text-center stats-card border-dashed">
@@ -400,6 +464,6 @@ export default function Settings() {
                     ))}
                 </div>
             </div>
-        </Layout>
+        </Layout >
     );
 }

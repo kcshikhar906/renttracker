@@ -3,7 +3,7 @@ import Layout from "./Layout";
 import TransactionList from "./TransactionList";
 import { db, auth } from "../firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, deleteDoc, doc } from "firebase/firestore";
 import { motion } from "framer-motion";
 import { HiOutlineTrendingUp, HiOutlineCreditCard, HiOutlineLightningBolt } from "react-icons/hi";
 
@@ -73,6 +73,16 @@ export default function Dashboard() {
         return () => unsubscribeData();
     }, [user]);
 
+    const handleDelete = async (id) => {
+        if (!window.confirm("Are you sure you want to delete this record?")) return;
+        try {
+            await deleteDoc(doc(db, "transactions", id));
+        } catch (err) {
+            console.error("Delete failed:", err);
+            alert("Failed to delete record.");
+        }
+    };
+
     if (loading && !user) {
         return (
             <div className="min-h-screen bg-slate-950 flex items-center justify-center">
@@ -126,7 +136,11 @@ export default function Dashboard() {
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="text-lg font-bold text-slate-100">Transaction History</h3>
                     </div>
-                    <TransactionList transactions={transactions} loading={loading} />
+                    <TransactionList
+                        transactions={transactions}
+                        loading={loading}
+                        onDelete={handleDelete}
+                    />
                 </section>
             </div>
         </Layout>
