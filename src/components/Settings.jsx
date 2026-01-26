@@ -2,156 +2,258 @@ import React, { useEffect, useState } from "react";
 import Layout from "./Layout";
 import { useAuth } from "../contexts/AuthContext";
 import { db } from "../firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
 import {
+    collection,
+    query,
+    where,
+    onSnapshot,
+    addDoc,
+    updateDoc,
+    deleteDoc,
+    doc
+} from "firebase/firestore";
+import {
+    HiOutlineHome,
     HiOutlineUser,
-    HiOutlineMail,
     HiOutlineCurrencyDollar,
-    HiOutlineCheckCircle,
-    HiOutlineShieldCheck
+    HiOutlineCalendar,
+    HiOutlineTrash,
+    HiOutlinePencilAlt,
+    HiOutlinePlus,
+    HiOutlineCheckCircle
 } from "react-icons/hi";
 import { motion, AnimatePresence } from "framer-motion";
+import { format } from "date-fns";
 
 export default function Settings() {
     const { currentUser } = useAuth();
-    const [monthlyRent, setMonthlyRent] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [saveSuccess, setSaveSuccess] = useState(false);
+    const [properties, setProperties] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    // Property Form State
+    const [showAddForm, setShowAddForm] = useState(false);
+    const [editingId, setEditingId] = useState(null);
+    const [formData, setFormData] = useState({
+        name: "",
+        rentAmount: "",
+        tenantName: "",
+        paidUpTo: format(new Date(), "yyyy-MM-dd")
+    });
 
     useEffect(() => {
-        async function loadSettings() {
-            if (!currentUser) return;
-            const docRef = doc(db, "settings", currentUser.uid);
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists()) {
-                setMonthlyRent(docSnap.data().monthlyRent || "");
-            }
-        }
-        loadSettings();
-    }, [currentUser]);
-
-    async function handleSaveSettings(e) {
-        e.preventDefault();
         if (!currentUser) return;
 
+        const q = query(
+            collection(db, "properties"),
+            where("uid", "==", currentUser.uid)
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const data = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            setProperties(data);
+            setLoading(false);
+        });
+
+        return unsubscribe;
+    }, [currentUser]);
+
+    async function handleSubmit(e) {
+        e.preventDefault();
         try {
             setLoading(true);
-            await setDoc(doc(db, "settings", currentUser.uid), {
-                monthlyRent: parseFloat(monthlyRent) || 0,
+            const payload = {
+                uid: currentUser.uid,
+                name: formData.name,
+                rentAmount: parseFloat(formData.rentAmount),
+                tenantName: formData.tenantName,
+                paidUpTo: formData.paidUpTo, // Store as ISO string
                 updatedAt: new Date().toISOString()
-            }, { merge: true });
+            };
 
-            setSaveSuccess(true);
-            setTimeout(() => setSaveSuccess(false), 3000);
+            if (editingId) {
+                await updateDoc(doc(db, "properties", editingId), payload);
+            } else {
+                await addDoc(collection(db, "properties"), payload);
+            }
+
+            resetForm();
         } catch (err) {
-            console.error("Failed to save settings:", err);
-            alert("Failed to save configuration.");
+            console.error("Property error:", err);
+            alert("Failed to save property.");
         } finally {
             setLoading(false);
         }
     }
 
+    async function handleDelete(id) {
+        if (window.confirm("Are you sure? This will delete the property record.")) {
+            try {
+                await deleteDoc(doc(db, "properties", id));
+            } catch (err) {
+                console.error(err);
+            }
+        }
+    }
+
+    function handleEdit(p) {
+        setEditingId(p.id);
+        setFormData({
+            name: p.name,
+            rentAmount: p.rentAmount.toString(),
+            tenantName: p.tenantName,
+            paidUpTo: p.paidUpTo
+        });
+        setShowAddForm(true);
+    }
+
+    function resetForm() {
+        setFormData({
+            name: "",
+            rentAmount: "",
+            tenantName: "",
+            paidUpTo: format(new Date(), "yyyy-MM-dd")
+        });
+        setEditingId(null);
+        setShowAddForm(false);
+    }
+
     return (
         <Layout>
-            <div className="max-w-4xl mx-auto space-y-8">
-                <div>
-                    <h2 className="text-3xl font-bold text-slate-100 tracking-tight">System Settings</h2>
-                    <p className="text-slate-500 mt-1">Configure your profile and rental parameters.</p>
+            <div className="max-w-6xl mx-auto space-y-8 pb-20">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h2 className="text-3xl font-bold text-slate-100 tracking-tight">Property Management</h2>
+                        <p className="text-slate-500 mt-1">Manage your rental units and tenant details.</p>
+                    </div>
+                    <button
+                        onClick={() => setShowAddForm(true)}
+                        className="btn-primary gap-2 py-3 px-6"
+                    >
+                        <HiOutlinePlus className="text-xl" />
+                        Add Property
+                    </button>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* User Profile Card */}
-                    <div className="lg:col-span-1">
-                        <div className="stats-card h-full flex flex-col items-center text-center p-8 bg-gradient-to-b from-slate-900 to-slate-950">
-                            <div className="relative mb-6">
-                                {currentUser?.photoURL ? (
-                                    <img src={currentUser.photoURL} alt="Profile" className="w-24 h-24 rounded-full border-4 border-slate-800 shadow-2xl" />
-                                ) : (
-                                    <div className="w-24 h-24 rounded-full bg-slate-800 flex items-center justify-center border-4 border-slate-700">
-                                        <HiOutlineUser className="text-4xl text-slate-500" />
-                                    </div>
-                                )}
-                                <div className="absolute bottom-0 right-0 bg-brand p-1.5 rounded-full border-4 border-slate-950">
-                                    <HiOutlineShieldCheck className="text-white text-sm" />
+                {/* Form Section */}
+                <AnimatePresence>
+                    {showAddForm && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            className="stats-card p-8 border-brand/30"
+                        >
+                            <h3 className="text-xl font-bold text-slate-100 mb-6 flex items-center gap-2">
+                                {editingId ? "Edit Property" : "Add New Property"}
+                            </h3>
+                            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                                <div className="space-y-2 col-span-1 md:col-span-1 border-r border-slate-800 pr-4">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Property Name</label>
+                                    <input
+                                        required
+                                        className="input-field py-2.5 text-sm"
+                                        placeholder="e.g. Ultimo Room"
+                                        value={formData.name}
+                                        onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                    />
                                 </div>
-                            </div>
-                            <h3 className="text-xl font-bold text-slate-100">{currentUser?.displayName || 'Authorized User'}</h3>
-                            <p className="text-slate-500 text-sm mt-1">{currentUser?.email}</p>
-
-                            <div className="mt-8 pt-8 border-t border-slate-800 w-full space-y-4">
-                                <div className="flex items-center gap-3 text-left">
-                                    <HiOutlineMail className="text-slate-600 text-xl" />
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Login Identifier</p>
-                                        <p className="text-xs text-slate-300 truncate">{currentUser?.email}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Configuration Form */}
-                    <div className="lg:col-span-2 space-y-6">
-                        <div className="stats-card p-8">
-                            <h4 className="text-lg font-bold text-slate-100 mb-6 flex items-center gap-3">
-                                <span className="w-1 h-6 bg-brand rounded-full"></span>
-                                Rental Configuration
-                            </h4>
-
-                            <form onSubmit={handleSaveSettings} className="space-y-6">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest px-1">Fixed Monthly Rent</label>
+                                <div className="space-y-2 border-r border-slate-800 pr-4">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Rent p/w</label>
                                     <div className="relative">
-                                        <HiOutlineCurrencyDollar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-lg" />
+                                        <HiOutlineCurrencyDollar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                                         <input
+                                            required
                                             type="number"
-                                            step="0.01"
-                                            placeholder="0.00"
-                                            className="input-field pl-12"
-                                            value={monthlyRent}
-                                            onChange={(e) => setMonthlyRent(e.target.value)}
+                                            className="input-field pl-9 py-2.5 text-sm"
+                                            placeholder="280"
+                                            value={formData.rentAmount}
+                                            onChange={e => setFormData({ ...formData, rentAmount: e.target.value })}
                                         />
                                     </div>
-                                    <p className="text-[10px] text-slate-600 px-1 mt-2 leading-relaxed">
-                                        This value is used as a baseline for your "Rent" category transactions.
-                                        Set this to your standard monthly payment amount.
-                                    </p>
                                 </div>
-
-                                <div className="pt-4">
-                                    <button
-                                        disabled={loading || saveSuccess}
-                                        type="submit"
-                                        className="btn-primary w-full py-4 uppercase tracking-widest font-bold text-xs"
-                                    >
-                                        <AnimatePresence mode="wait">
-                                            {loading ? (
-                                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
-                                                    <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-                                                    Syncing...
-                                                </motion.div>
-                                            ) : saveSuccess ? (
-                                                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex items-center gap-2 text-success">
-                                                    <HiOutlineCheckCircle className="text-lg" />
-                                                    Configuration Updated
-                                                </motion.div>
-                                            ) : (
-                                                "Commit Changes"
-                                            )}
-                                        </AnimatePresence>
+                                <div className="space-y-2 border-r border-slate-800 pr-4">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Tenant Name</label>
+                                    <input
+                                        required
+                                        className="input-field py-2.5 text-sm"
+                                        placeholder="John Doe"
+                                        value={formData.tenantName}
+                                        onChange={e => setFormData({ ...formData, tenantName: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Paid Up To</label>
+                                    <input
+                                        required
+                                        type="date"
+                                        className="input-field py-2.5 text-sm"
+                                        value={formData.paidUpTo}
+                                        onChange={e => setFormData({ ...formData, paidUpTo: e.target.value })}
+                                    />
+                                </div>
+                                <div className="md:col-span-2 lg:col-span-4 flex justify-end gap-3 mt-6 pt-6 border-t border-slate-800">
+                                    <button type="button" onClick={resetForm} className="btn-ghost text-xs">Cancel</button>
+                                    <button type="submit" className="btn-primary py-2 px-8 text-xs font-bold uppercase tracking-widest">
+                                        {editingId ? "Update Record" : "Save Property"}
                                     </button>
                                 </div>
                             </form>
-                        </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
-                        <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6">
-                            <h4 className="text-sm font-bold text-slate-400 mb-4 uppercase tracking-widest">Administrative Notice</h4>
-                            <p className="text-xs text-slate-500 leading-relaxed italic">
-                                These settings are stored globally for your account and affect how the dashboard calculates your financial summary.
-                                Data encryption is applied at the document level using Firebase standard security protocols.
-                            </p>
+                {/* Properties List */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {properties.length === 0 && !loading && (
+                        <div className="col-span-full py-20 text-center">
+                            <HiOutlineHome className="text-6xl text-slate-800 mx-auto mb-4" />
+                            <p className="text-slate-500">No properties registered. Add one to start tracking rent.</p>
                         </div>
-                    </div>
+                    )}
+
+                    {properties.map(p => (
+                        <motion.div
+                            layout
+                            key={p.id}
+                            className="stats-card group hover:border-brand/40"
+                        >
+                            <div className="flex items-start justify-between mb-4">
+                                <div className="p-3 bg-brand/10 border border-brand/20 rounded-2xl text-brand">
+                                    <HiOutlineHome className="text-2xl" />
+                                </div>
+                                <div className="flex gap-1">
+                                    <button onClick={() => handleEdit(p)} className="p-2 text-slate-500 hover:text-white transition-colors">
+                                        <HiOutlinePencilAlt />
+                                    </button>
+                                    <button onClick={() => handleDelete(p.id)} className="p-2 text-slate-500 hover:text-danger transition-colors">
+                                        <HiOutlineTrash />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <h3 className="text-xl font-bold text-slate-200">{p.name}</h3>
+                            <div className="flex items-center gap-2 mt-1">
+                                <HiOutlineUser className="text-slate-600" />
+                                <span className="text-sm font-medium text-slate-500">{p.tenantName}</span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 mt-8 pt-6 border-t border-slate-800">
+                                <div>
+                                    <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-1">Weekly Rent</p>
+                                    <p className="text-lg font-bold text-slate-100">${p.rentAmount}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-1">Paid Up To</p>
+                                    <p className="text-sm font-bold text-slate-300">
+                                        {format(new Date(p.paidUpTo), "MMM dd, yyyy")}
+                                    </p>
+                                </div>
+                            </div>
+                        </motion.div>
+                    ))}
                 </div>
             </div>
         </Layout>
