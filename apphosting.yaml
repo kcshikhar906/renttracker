@@ -1,0 +1,22 @@
+# Firebase App Hosting Configuration
+# This file tells Firebase how to build and run your application.
+# For a Vite project, we want to build the static site and serve it.
+
+kind: "apphosting"
+schemaVersion: "v1"
+
+# Build configuration
+# Firebase will automatically run 'npm run build' if it detects a package.json
+# We specify where the build output is located.
+# Note: App Hosting currently expects a server for some configurations,
+# but providing a clear start command or using a supported framework is key.
+
+runConfig:
+  # App Hosting expects a process to listen on the port defined by $PORT
+  # For static Vite apps, we can use a simple node server to serve 'dist'
+  command: "npm run start"
+
+# Environment variables can be added here if needed
+# env:
+#   - variable: API_URL
+#     value: "https://your-api.com"
