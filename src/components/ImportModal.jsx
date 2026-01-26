@@ -8,6 +8,7 @@ import { format, parseISO, isValid } from "date-fns";
 
 export default function ImportModal({ isOpen, onClose, user, properties }) {
     const [file, setFile] = useState(null);
+    const [selectedPropertyId, setSelectedPropertyId] = useState("");
     const [previewData, setPreviewData] = useState([]);
     const [importing, setImporting] = useState(false);
     const [progress, setProgress] = useState(0);
@@ -27,106 +28,147 @@ export default function ImportModal({ isOpen, onClose, user, properties }) {
                 const wb = XLSX.read(bstr, { type: 'binary', cellDates: true });
                 const wsname = wb.SheetNames[0];
                 const ws = wb.Sheets[wsname];
-                const data = XLSX.utils.sheet_to_json(ws, { raw: false, dateNF: 'yyyy-mm-dd' });
+                const data = XLSX.utils.sheet_to_json(ws, { raw: false });
 
                 if (data.length === 0) {
                     setError("The selected file is empty.");
                     return;
                 }
 
-                // Map preview rows
-                const preview = data.slice(0, 5).map(row => mapRow(row));
-                setPreviewData(preview);
+                // Process preview
+                const previewItems = [];
+                data.slice(0, 5).forEach(row => {
+                    const mapped = mapSpecificRow(row);
+                    if (mapped.rent) previewItems.push(mapped.rent);
+                    if (mapped.bill) previewItems.push(mapped.bill);
+                });
+                setPreviewData(previewItems.slice(0, 5));
             } catch (err) {
+                console.error(err);
                 setError("Failed to parse file. Ensure it's a valid Excel or CSV.");
             }
         };
         reader.readAsBinaryString(selectedFile);
     };
 
-    const mapRow = (row) => {
-        // Find keys case-insensitively
-        const findKey = (keys) => {
+    const parseExcelDate = (dateVal) => {
+        if (!dateVal) return new Date();
+        const d = new Date(dateVal);
+        return isValid(d) ? d : new Date();
+    };
+
+    const mapSpecificRow = (row) => {
+        // Find keys case-insensitively or by common fragments
+        const findVal = (fragments) => {
             const entry = Object.entries(row).find(([k]) =>
-                keys.some(key => k.toLowerCase().includes(key.toLowerCase()))
+                fragments.some(f => k.toLowerCase().includes(f.toLowerCase()))
             );
             return entry ? entry[1] : null;
         };
 
-        const rawDate = findKey(["date", "payment"]);
-        const type = findKey(["type"])?.toUpperCase() || "RENT";
-        const amount = parseFloat(findKey(["amount"])?.toString().replace(/[^0-9.]/g, '') || 0);
-        const notes = findKey(["notes", "description"]) || "";
-        const propertyName = findKey(["property"]) || "Unknown";
-        const tenant = findKey(["tenant"]) || "";
+        const dateStr = findVal(["date of payment"]) || Object.values(row)[0]; // Fallback to first column
+        const paymentDate = parseExcelDate(dateStr);
 
-        // Attempt to match property ID
-        const matchedProperty = properties.find(p => p.name.toLowerCase() === propertyName.toLowerCase());
+        const rentAmount = parseFloat(findVal(["amount"])?.toString().replace(/[^0-9.]/g, '') || 0);
+        const billAmount = parseFloat(findVal(["bills"])?.toString().replace(/[^0-9.]/g, '') || 0);
+        const tenant = findVal(["paid to"]) || "";
+        const startDate = findVal(["start date"]);
+        const endDate = findVal(["end date"]);
 
-        return {
-            date: rawDate,
-            type: type === "BILL" ? "BILL" : "RENT",
-            amount,
-            notes,
-            propertyName,
-            propertyId: matchedProperty?.id || "",
-            tenant
-        };
+        const result = { rent: null, bill: null };
+
+        if (rentAmount > 0) {
+            result.rent = {
+                type: "RENT",
+                amount: rentAmount,
+                date: paymentDate,
+                startDate: startDate ? parseExcelDate(startDate) : null,
+                endDate: endDate ? parseExcelDate(endDate) : null,
+                tenant: tenant,
+                notes: "Imported from Excel"
+            };
+        }
+
+        if (billAmount > 0) {
+            result.bill = {
+                type: "BILL",
+                amount: billAmount,
+                date: paymentDate,
+                tenant: tenant,
+                notes: "Bill Imported from Excel"
+            };
+        }
+
+        return result;
     };
 
     const handleImport = async () => {
-        if (!file || !user) return;
+        if (!file || !user || !selectedPropertyId) {
+            if (!selectedPropertyId) setError("Please select a target property first.");
+            return;
+        }
         setImporting(true);
-        setProgress(10);
+        setProgress(5);
         setError("");
+
+        const targetProperty = properties.find(p => p.id === selectedPropertyId);
 
         const reader = new FileReader();
         reader.onload = async (evt) => {
             try {
                 const bstr = evt.target.result;
-                const wb = XLSX.read(bstr, { type: 'binary' });
+                const wb = XLSX.read(bstr, { type: 'binary', cellDates: true });
                 const ws = wb.Sheets[wb.SheetNames[0]];
-                const data = XLSX.utils.sheet_to_json(ws, { raw: false });
+                const data = XLSX.utils.sheet_to_json(ws);
+
+                const allTransactions = [];
+                data.forEach(row => {
+                    const { rent, bill } = mapSpecificRow(row);
+                    if (rent) allTransactions.push(rent);
+                    if (bill) allTransactions.push(bill);
+                });
+
+                if (allTransactions.length === 0) {
+                    setError("No valid transactions found in the file.");
+                    setImporting(false);
+                    return;
+                }
 
                 const batchSize = 500;
                 let processed = 0;
 
-                for (let i = 0; i < data.length; i += batchSize) {
+                for (let i = 0; i < allTransactions.length; i += batchSize) {
                     const batch = writeBatch(db);
-                    const chunk = data.slice(i, i + batchSize);
+                    const chunk = allTransactions.slice(i, i + batchSize);
 
-                    chunk.forEach(rawRow => {
-                        const mapped = mapRow(rawRow);
+                    chunk.forEach(t => {
                         const docRef = doc(collection(db, "transactions"));
+                        const dataToSave = {
+                            uid: user.uid,
+                            date: Timestamp.fromDate(t.date),
+                            amount: t.amount,
+                            type: t.type,
+                            notes: t.notes,
+                            propertyName: targetProperty?.name || "Unknown",
+                            propertyId: selectedPropertyId,
+                            tenant: t.tenant,
+                            status: "PAID",
+                            createdAt: Timestamp.now()
+                        };
 
-                        // Parse date properly
-                        let finalDate;
-                        if (mapped.date instanceof Date) {
-                            finalDate = mapped.date;
-                        } else if (typeof mapped.date === "string") {
-                            const parsed = parseISO(mapped.date);
-                            finalDate = isValid(parsed) ? parsed : new Date();
-                        } else {
-                            finalDate = new Date();
+                        if (t.type === "RENT" && t.startDate && t.endDate) {
+                            dataToSave.startDate = Timestamp.fromDate(t.startDate);
+                            dataToSave.endDate = Timestamp.fromDate(t.endDate);
+                            dataToSave.periodStart = format(t.startDate, "yyyy-MM-dd");
+                            dataToSave.periodEnd = format(t.endDate, "yyyy-MM-dd");
                         }
 
-                        batch.set(docRef, {
-                            uid: user.uid,
-                            date: Timestamp.fromDate(finalDate),
-                            amount: mapped.amount,
-                            type: mapped.type,
-                            notes: mapped.notes,
-                            propertyName: mapped.propertyName,
-                            propertyId: mapped.propertyId,
-                            tenant: mapped.tenant,
-                            status: "PAID", // Default for import
-                            createdAt: Timestamp.now()
-                        });
+                        batch.set(docRef, dataToSave);
                     });
 
                     await batch.commit();
                     processed += chunk.length;
-                    setProgress(Math.round((processed / data.length) * 100));
+                    setProgress(Math.round((processed / allTransactions.length) * 100));
                 }
 
                 setSuccessCount(processed);
@@ -146,6 +188,7 @@ export default function ImportModal({ isOpen, onClose, user, properties }) {
 
     const resetState = () => {
         setFile(null);
+        setSelectedPropertyId("");
         setPreviewData([]);
         setProgress(0);
         setSuccessCount(0);
@@ -197,13 +240,27 @@ export default function ImportModal({ isOpen, onClose, user, properties }) {
                                 ) : (
                                     <div className="space-y-6">
                                         <div className="flex items-center justify-between">
-                                            <p className="text-sm text-slate-400">Upload your bank export or existing spreadsheet.</p>
+                                            <p className="text-sm text-slate-400">Upload your historical records.</p>
                                             <button
                                                 onClick={downloadTemplate}
                                                 className="flex items-center gap-2 text-[10px] font-black text-brand uppercase tracking-widest hover:text-brand-light transition-colors"
                                             >
-                                                <HiOutlineDownload className="text-lg" /> Download Template
+                                                <HiOutlineDownload className="text-lg" /> Template
                                             </button>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Assign to Property</label>
+                                            <select
+                                                value={selectedPropertyId}
+                                                onChange={(e) => setSelectedPropertyId(e.target.value)}
+                                                className="w-full bg-slate-950/50 border border-slate-800 rounded-2xl px-5 py-4 text-white text-sm font-bold focus:border-brand/40 outline-none transition-all cursor-pointer"
+                                            >
+                                                <option value="">Choose target Unit/Asset...</option>
+                                                {properties.map(p => (
+                                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                                ))}
+                                            </select>
                                         </div>
 
                                         <div className="relative group">
@@ -242,9 +299,11 @@ export default function ImportModal({ isOpen, onClose, user, properties }) {
                                                         <tbody className="divide-y divide-slate-800/50">
                                                             {previewData.map((row, idx) => (
                                                                 <tr key={idx} className="text-slate-300">
-                                                                    <td className="px-4 py-2">{row.date || "N/A"}</td>
+                                                                    <td className="px-4 py-2">{row.date ? format(row.date, "MMM dd, yyyy") : "N/A"}</td>
                                                                     <td className={`px-4 py-2 font-bold ${row.type === 'RENT' ? 'text-brand' : 'text-warning'}`}>{row.type}</td>
-                                                                    <td className="px-4 py-2 truncate max-w-[120px]">{row.propertyName}</td>
+                                                                    <td className="px-4 py-2 truncate max-w-[120px]">
+                                                                        {properties.find(p => p.id === selectedPropertyId)?.name || "—"}
+                                                                    </td>
                                                                     <td className="px-4 py-2 font-black">${row.amount.toFixed(2)}</td>
                                                                 </tr>
                                                             ))}
@@ -289,8 +348,8 @@ export default function ImportModal({ isOpen, onClose, user, properties }) {
                             </DialogPanel>
                         </TransitionChild>
                     </div>
-                </div>
-            </Dialog>
-        </Transition>
+                </div >
+            </Dialog >
+        </Transition >
     );
 }
