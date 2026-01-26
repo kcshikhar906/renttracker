@@ -1,38 +1,21 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { db } from "../firebase";
-import { useAuth } from "../contexts/AuthContext";
-import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
-import { ExternalLink, Receipt, Calendar, Info, Clock, ArrowUpRight, Home } from "lucide-react";
+import { doc, deleteDoc } from "firebase/firestore";
+import { Receipt, Calendar, Info, Trash2, ExternalLink, Home } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-export default function TransactionList() {
-    const { currentUser } = useAuth();
-    const [transactions, setTransactions] = useState([]);
-    const [loading, setLoading] = useState(true);
+export default function TransactionList({ transactions, loading }) {
 
-    useEffect(() => {
-        if (!currentUser) return;
-
-        const q = query(
-            collection(db, "transactions"),
-            where("uid", "==", currentUser.uid),
-            orderBy("date", "desc")
-        );
-
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const data = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
-            setTransactions(data);
-            setLoading(false);
-        }, (err) => {
-            console.error("Firestore error:", err);
-            setLoading(false);
-        });
-
-        return unsubscribe;
-    }, [currentUser]);
+    async function handleDelete(id) {
+        if (window.confirm("Are you sure you want to delete this transaction? This action cannot be undone.")) {
+            try {
+                await deleteDoc(doc(db, "transactions", id));
+            } catch (err) {
+                console.error("Error deleting document: ", err);
+                alert("Failed to delete transaction.");
+            }
+        }
+    }
 
     if (loading) {
         return (
@@ -58,72 +41,81 @@ export default function TransactionList() {
     }
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-4 pb-8">
             <AnimatePresence mode="popLayout">
-                {transactions.map((t, index) => (
-                    <motion.div
-                        key={t.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ delay: index * 0.05 }}
-                        className="group relative overflow-hidden"
-                    >
-                        <div className="card !p-5 group-hover:border-slate-600 transition-colors">
-                            <div className="flex items-center justify-between gap-4">
-                                <div className="flex items-center gap-4">
-                                    <div className={`p-3 rounded-2xl ${t.type === "RENT" ? "bg-indigo-500/10 text-indigo-400" : "bg-purple-500/10 text-purple-400"
-                                        }`}>
-                                        {t.type === "RENT" ? <Home className="w-6 h-6" /> : <Receipt className="w-6 h-6" />}
-                                    </div>
-                                    <div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-bold text-lg">${t.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${t.type === "RENT" ? "bg-indigo-500/20 text-indigo-400" : "bg-purple-500/20 text-purple-400"
-                                                }`}>
-                                                {t.type}
-                                            </span>
+                {transactions.map((t, index) => {
+                    const isRent = t.type === "RENT";
+                    return (
+                        <motion.div
+                            key={t.id}
+                            layout
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            transition={{ duration: 0.2 }}
+                            className="group relative"
+                        >
+                            <div className="card !p-5 group-hover:bg-white/5 transition-all duration-300">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div className="flex items-center gap-4">
+                                        <div className={`p-3 rounded-2xl ${isRent ? "bg-emerald-500/10 text-emerald-400" : "bg-orange-500/10 text-orange-400"
+                                            }`}>
+                                            {isRent ? <Home className="w-6 h-6" /> : <Receipt className="w-6 h-6" />}
                                         </div>
-                                        <div className="flex items-center gap-3 text-sm text-slate-400 mt-0.5">
-                                            <div className="flex items-center gap-1">
-                                                <Calendar className="w-3 h-3" />
-                                                {new Date(t.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-bold text-xl text-white">
+                                                    ${t.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                </span>
+                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${isRent ? "bg-emerald-500/20 text-emerald-400" : "bg-orange-500/20 text-orange-400"
+                                                    }`}>
+                                                    {t.type}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-3 text-sm text-slate-400 mt-1">
+                                                <div className="flex items-center gap-1">
+                                                    <Calendar className="w-3 h-3" />
+                                                    {new Date(t.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
+
+                                    <div className="flex items-center gap-2 sm:self-center">
+                                        {t.fileUrl && (
+                                            <a
+                                                href={t.fileUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex items-center gap-2 px-3 py-2 bg-slate-800/50 hover:bg-slate-700 rounded-xl text-xs font-medium text-slate-300 transition-all border border-slate-700/50"
+                                            >
+                                                <ExternalLink className="w-3.5 h-3.5" />
+                                                View Proof
+                                            </a>
+                                        )}
+                                        <button
+                                            onClick={() => handleDelete(t.id)}
+                                            className="p-2.5 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white rounded-xl transition-all duration-200 border border-red-500/20"
+                                            title="Delete Transaction"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
                                 </div>
 
-                                <div className="flex items-center gap-2">
-                                    {t.fileUrl ? (
-                                        <a
-                                            href={t.fileUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-400 hover:text-indigo-400 transition-all border border-slate-700/50"
-                                            title="View Receipt"
-                                        >
-                                            <ArrowUpRight className="w-5 h-5" />
-                                        </a>
-                                    ) : (
-                                        <div className="p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <Clock className="w-5 h-5 text-slate-600" />
-                                        </div>
-                                    )}
-                                </div>
+                                {t.notes && (
+                                    <div className="mt-4 pt-4 border-t border-white/5">
+                                        <p className="text-sm text-slate-400 italic">"{t.notes}"</p>
+                                    </div>
+                                )}
                             </div>
 
-                            {t.notes && (
-                                <div className="mt-4 pt-4 border-t border-slate-700/50">
-                                    <p className="text-sm text-slate-300 line-clamp-2 italic">"{t.notes}"</p>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Subtle accents */}
-                        <div className={`absolute left-0 top-0 bottom-0 w-1 ${t.type === "RENT" ? "bg-indigo-500" : "bg-purple-500"
-                            } opacity-40`}></div>
-                    </motion.div>
-                ))}
+                            {/* Accent Line */}
+                            <div className={`absolute left-0 top-6 bottom-6 w-1 rounded-r-full ${isRent ? "bg-emerald-500" : "bg-orange-500"
+                                } opacity-60`}></div>
+                        </motion.div>
+                    );
+                })}
             </AnimatePresence>
         </div>
     );
