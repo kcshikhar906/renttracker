@@ -8,11 +8,12 @@ import ExportMenu from "./ExportMenu";
 import ImportModal from "./ImportModal";
 import { db, auth } from "../firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, query, where, orderBy, onSnapshot, deleteDoc, doc, getDocs } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, updateDoc, doc, getDocs } from "firebase/firestore";
 import { format, isWithinInterval, startOfDay, endOfDay, parseISO, isValid } from "date-fns";
 import { HiOutlineSearch, HiOutlineFilter, HiOutlineCollection, HiOutlineX, HiOutlineDocumentDownload, HiOutlineDownload } from "react-icons/hi";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import DeleteConfirmationModal from "./DeleteConfirmationModal";
 
 export default function Transactions() {
     const [transactions, setTransactions] = useState([]);
@@ -27,6 +28,10 @@ export default function Transactions() {
     const [isDetailOpen, setIsDetailOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [editingTransaction, setEditingTransaction] = useState(null);
+
+    // Delete states
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [transactionToDelete, setTransactionToDelete] = useState(null);
 
     // PDF Export States
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -76,6 +81,8 @@ export default function Transactions() {
         const q = query(
             collection(db, "transactions"),
             where("uid", "==", user.uid),
+            where("isDeleted", "!=", true),
+            orderBy("isDeleted"),
             orderBy("date", "desc")
         );
 
@@ -157,13 +164,22 @@ export default function Transactions() {
         setIsEditOpen(true);
     };
 
-    const handleDelete = async (id) => {
-        if (!window.confirm("ARE YOU SURE? THIS WILL PERMANENTLY ERASE THE RECORD.")) return;
+    const handleDelete = (transaction) => {
+        setTransactionToDelete(transaction);
+        setIsDeleteModalOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!transactionToDelete) return;
         try {
-            await deleteDoc(doc(db, "transactions", id));
+            await updateDoc(doc(db, "transactions", transactionToDelete.id), {
+                isDeleted: true
+            });
+            setIsDeleteModalOpen(false);
+            setTransactionToDelete(null);
         } catch (err) {
-            console.error("Delete failed:", err);
-            alert("Failed to delete record.");
+            console.error("Soft delete failed:", err);
+            alert("Failed to move transaction to trash.");
         }
     };
 
@@ -478,6 +494,14 @@ export default function Transactions() {
                 onClose={() => setIsImportOpen(false)}
                 user={user}
                 properties={properties}
+            />
+
+            {/* Delete Confirmation Modal */}
+            <DeleteConfirmationModal
+                isOpen={isDeleteModalOpen}
+                onClose={() => setIsDeleteModalOpen(false)}
+                onConfirm={confirmDelete}
+                transaction={transactionToDelete}
             />
 
             {/* Profile Selection Modal */}

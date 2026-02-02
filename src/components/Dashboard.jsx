@@ -4,9 +4,10 @@ import TransactionList from "./TransactionList";
 import ExpenseCharts from "./ExpenseCharts";
 import { db, auth } from "../firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, query, where, orderBy, onSnapshot, deleteDoc, doc } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, updateDoc, doc } from "firebase/firestore";
 import { motion } from "framer-motion";
 import { HiOutlineTrendingUp, HiOutlineCreditCard, HiOutlineLightningBolt } from "react-icons/hi";
+import DeleteConfirmationModal from "./DeleteConfirmationModal";
 
 const StatCard = ({ title, amount, icon: Icon, colorClass }) => (
     <div className="stats-card">
@@ -29,6 +30,10 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(true);
     const [user, setUser] = useState(null);
 
+    // Delete states
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [transactionToDelete, setTransactionToDelete] = useState(null);
+
     useEffect(() => {
         // Critical Fix: Only fetch data once user is authenticated
         const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
@@ -46,6 +51,8 @@ export default function Dashboard() {
         const q = query(
             collection(db, "transactions"),
             where("uid", "==", user.uid),
+            where("isDeleted", "!=", true),
+            orderBy("isDeleted"),
             orderBy("date", "desc")
         );
 
@@ -74,13 +81,22 @@ export default function Dashboard() {
         return () => unsubscribeData();
     }, [user]);
 
-    const handleDelete = async (id) => {
-        if (!window.confirm("Are you sure you want to delete this record?")) return;
+    const handleDelete = (transaction) => {
+        setTransactionToDelete(transaction);
+        setIsDeleteModalOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!transactionToDelete) return;
         try {
-            await deleteDoc(doc(db, "transactions", id));
+            await updateDoc(doc(db, "transactions", transactionToDelete.id), {
+                isDeleted: true
+            });
+            setIsDeleteModalOpen(false);
+            setTransactionToDelete(null);
         } catch (err) {
-            console.error("Delete failed:", err);
-            alert("Failed to delete record.");
+            console.error("Soft delete failed:", err);
+            alert("Failed to move records to trash.");
         }
     };
 
@@ -147,6 +163,14 @@ export default function Dashboard() {
                     />
                 </section>
             </div>
+
+            {/* Delete Confirmation Modal */}
+            <DeleteConfirmationModal
+                isOpen={isDeleteModalOpen}
+                onClose={() => setIsDeleteModalOpen(false)}
+                onConfirm={confirmDelete}
+                transaction={transactionToDelete}
+            />
         </Layout>
     );
 }

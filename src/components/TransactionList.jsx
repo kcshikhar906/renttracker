@@ -185,7 +185,7 @@ export default function TransactionList({ transactions, loading, onSelect, onEdi
                                     </button>
                                     {onDelete && (
                                         <button
-                                            onClick={(e) => { e.stopPropagation(); onDelete(t.id); }}
+                                            onClick={(e) => { e.stopPropagation(); onDelete(t); }}
                                             className="p-2 bg-slate-900 border border-slate-800 text-slate-500 rounded-xl hover:bg-danger hover:text-white hover:border-danger/50 transition-all shadow-sm"
                                             title="Delete Record"
                                         >

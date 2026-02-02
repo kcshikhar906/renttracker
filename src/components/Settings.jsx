@@ -22,7 +22,8 @@ import {
     HiOutlinePlus,
     HiOutlineX,
     HiOutlineClock,
-    HiOutlineCalendar
+    HiOutlineCalendar,
+    HiOutlineRefresh
 } from "react-icons/hi";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, parseISO, isValid } from "date-fns";
@@ -31,6 +32,7 @@ export default function Settings() {
     const { currentUser } = useAuth();
     const [properties, setProperties] = useState([]);
     const [reportProfiles, setReportProfiles] = useState([]);
+    const [archivedTransactions, setArchivedTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
 
     // Property Form State
@@ -61,9 +63,21 @@ export default function Settings() {
             setLoading(false);
         });
 
+        // Fetch Archived Transactions
+        const qArchived = query(
+            collection(db, "transactions"),
+            where("uid", "==", currentUser.uid),
+            where("isDeleted", "==", true)
+        );
+
+        const unsubArchived = onSnapshot(qArchived, (snapshot) => {
+            setArchivedTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        });
+
         return () => {
             unsubProps();
             unsubProfs();
+            unsubArchived();
         };
     }, [currentUser]);
 
@@ -87,6 +101,16 @@ export default function Settings() {
             await deleteDoc(doc(db, "profiles", id));
         } catch (err) {
             console.error(err);
+        }
+    };
+
+    const handleRestore = async (id) => {
+        try {
+            await updateDoc(doc(db, "transactions", id), {
+                isDeleted: false
+            });
+        } catch (err) {
+            console.error("Restore failed:", err);
         }
     };
 
@@ -462,6 +486,54 @@ export default function Settings() {
                             </div>
                         </motion.div>
                     ))}
+                </div>
+
+                {/* Archived Transactions (Trash Can) */}
+                <div className="mt-16 pt-16 border-t border-slate-800/50">
+                    <div className="flex items-center gap-3 mb-8">
+                        <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-500">
+                            <HiOutlineTrash className="text-xl" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-black text-white uppercase tracking-tighter">Archived Records</h2>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Trash Can & Restoration</p>
+                        </div>
+                    </div>
+
+                    {archivedTransactions.length === 0 ? (
+                        <div className="p-12 text-center rounded-[2.5rem] bg-slate-950/30 border border-slate-800/50 border-dashed">
+                            <p className="text-slate-600 font-bold uppercase tracking-widest text-[10px]">No deleted records found</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {archivedTransactions.map(t => (
+                                <div key={t.id} className="bg-slate-900/50 border border-slate-800 p-5 rounded-[2rem] flex flex-col gap-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex flex-col">
+                                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                                                {t.date?.toDate ? format(t.date.toDate(), "MMM dd, yyyy") : format(parseISO(t.date), "MMM dd, yyyy")}
+                                            </span>
+                                            <span className="text-sm font-black text-white">${t.amount?.toLocaleString()}</span>
+                                        </div>
+                                        <button
+                                            onClick={() => handleRestore(t.id)}
+                                            className="p-3 bg-emerald-600/10 text-emerald-500 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-lg shadow-emerald-600/20 border border-emerald-600/20 flex items-center gap-2 group/restore"
+                                            title="Restore to Ledger"
+                                        >
+                                            <HiOutlineRefresh className="text-lg group-hover:rotate-180 transition-transform duration-500" />
+                                            <span className="text-[10px] font-black uppercase">Restore</span>
+                                        </button>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`text-[8px] font-black px-2 py-0.5 rounded-full border ${t.type === 'RENT' ? 'bg-brand/10 text-brand border-brand/20' : 'bg-warning/10 text-warning border-warning/20'}`}>
+                                            {t.type}
+                                        </span>
+                                        <span className="text-[9px] font-bold text-slate-500 truncate max-w-[100px]">{t.propertyName || "Unknown"}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
         </Layout >
