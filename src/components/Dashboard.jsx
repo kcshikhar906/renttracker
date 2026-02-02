@@ -6,10 +6,11 @@ import { db, auth } from "../firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, query, where, orderBy, onSnapshot, updateDoc, doc } from "firebase/firestore";
 import { motion } from "framer-motion";
-import { HiOutlineTrendingUp, HiOutlineCreditCard, HiOutlineLightningBolt } from "react-icons/hi";
+import { HiOutlineTrendingUp, HiOutlineCreditCard, HiOutlineLightningBolt, HiOutlineCalendar } from "react-icons/hi";
 import DeleteConfirmationModal from "./DeleteConfirmationModal";
+import { format, addDays, parseISO } from "date-fns";
 
-const StatCard = ({ title, amount, icon: Icon, colorClass }) => (
+const StatCard = ({ title, amount, icon: Icon, colorClass, children }) => (
     <div className="stats-card">
         <div className="flex items-center justify-between mb-4">
             <div className={`p-2.5 rounded-xl bg-slate-950 border border-slate-800 ${colorClass}`}>
@@ -19,13 +20,17 @@ const StatCard = ({ title, amount, icon: Icon, colorClass }) => (
         </div>
         <p className="text-slate-500 text-sm font-medium">{title}</p>
         <h3 className="text-2xl font-bold text-slate-100 mt-1">
-            ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {typeof amount === 'number'
+                ? `$${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                : amount}
         </h3>
+        {children}
     </div>
 );
 
 export default function Dashboard() {
     const [transactions, setTransactions] = useState([]);
+    const [properties, setProperties] = useState([]);
     const [totals, setTotals] = useState({ rent: 0, bills: 0 });
     const [loading, setLoading] = useState(true);
     const [user, setUser] = useState(null);
@@ -79,7 +84,16 @@ export default function Dashboard() {
             setLoading(false);
         });
 
-        return () => unsubscribeData();
+        // Fetch Properties
+        const qProps = query(collection(db, "properties"), where("uid", "==", user.uid));
+        const unsubscribeProps = onSnapshot(qProps, (snapshot) => {
+            setProperties(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        });
+
+        return () => {
+            unsubscribeData();
+            unsubscribeProps();
+        };
     }, [user]);
 
     const handleDelete = (transaction) => {
@@ -101,6 +115,41 @@ export default function Dashboard() {
         }
     };
 
+    const getNextRentDue = () => {
+        const rentTx = transactions.filter(t => t.type === "RENT").sort((a, b) => {
+            const dateA = a.endDate?.toDate ? a.endDate.toDate() : (a.endDate ? parseISO(a.endDate) : new Date(0));
+            const dateB = b.endDate?.toDate ? b.endDate.toDate() : (b.endDate ? parseISO(b.endDate) : new Date(0));
+            return dateB - dateA;
+        })[0];
+
+        if (!rentTx) return null;
+
+        const lastEndDate = rentTx.endDate?.toDate ? rentTx.endDate.toDate() : (typeof rentTx.endDate === 'string' ? parseISO(rentTx.endDate) : null);
+        if (!lastEndDate) return null;
+
+        const nextDate = addDays(lastEndDate, 1);
+
+        return {
+            date: nextDate,
+            propertyName: rentTx.propertyName || "Property"
+        };
+    };
+
+    const addToCalendar = () => {
+        const nextDue = getNextRentDue();
+        if (!nextDue) return;
+
+        const title = `Pay Rent: ${nextDue.propertyName}`;
+        const startDate = format(nextDue.date, "yyyyMMdd");
+        const details = `Rent due for period starting ${format(nextDue.date, "MMM dd, yyyy")}.`;
+
+        // Google Calendar URL
+        const gCalUrl = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${startDate}/${startDate}&details=${encodeURIComponent(details)}&sf=true&output=xml`;
+
+        window.open(gCalUrl, '_blank');
+    };
+
+    const nextDueInfo = getNextRentDue();
     if (loading && !user) {
         return (
             <div className="min-h-screen bg-slate-950 flex items-center justify-center">
@@ -147,6 +196,22 @@ export default function Dashboard() {
                         icon={HiOutlineLightningBolt}
                         colorClass="text-success"
                     />
+                    <StatCard
+                        title="Next Rent Due"
+                        amount={nextDueInfo ? format(nextDueInfo.date, "MMM dd") : "No Due Date"}
+                        icon={HiOutlineCalendar}
+                        colorClass="text-brand"
+                    >
+                        {nextDueInfo && (
+                            <button
+                                onClick={addToCalendar}
+                                className="mt-4 w-full py-2 bg-slate-900 border border-slate-800 rounded-lg text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white hover:border-brand/50 transition-all flex items-center justify-center gap-2"
+                            >
+                                <HiOutlineCalendar className="text-lg" />
+                                Add to Calendar
+                            </button>
+                        )}
+                    </StatCard>
                 </div>
 
                 {/* Visual Analytics */}
