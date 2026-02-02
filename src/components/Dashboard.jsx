@@ -51,16 +51,17 @@ export default function Dashboard() {
         const q = query(
             collection(db, "transactions"),
             where("uid", "==", user.uid),
-            where("isDeleted", "!=", true),
-            orderBy("isDeleted"),
             orderBy("date", "desc")
         );
 
         const unsubscribeData = onSnapshot(q, (snapshot) => {
-            const data = snapshot.docs.map(doc => ({
+            const allDocs = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
             }));
+
+            // Filter out soft-deleted items on the client side
+            const data = allDocs.filter(t => t.isDeleted !== true);
 
             const rentTotal = data
                 .filter(t => t.type === "RENT")

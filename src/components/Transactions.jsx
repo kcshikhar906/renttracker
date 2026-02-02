@@ -81,13 +81,13 @@ export default function Transactions() {
         const q = query(
             collection(db, "transactions"),
             where("uid", "==", user.uid),
-            where("isDeleted", "!=", true),
-            orderBy("isDeleted"),
             orderBy("date", "desc")
         );
 
         const unsubscribeData = onSnapshot(q, (snapshot) => {
-            setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            const allDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            // Filter out soft-deleted items on the client side
+            setTransactions(allDocs.filter(t => t.isDeleted !== true));
             setLoading(false);
         }, (err) => {
             console.error("Firestore error:", err);
