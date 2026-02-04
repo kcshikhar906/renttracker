@@ -22,8 +22,16 @@ export default function Login() {
             await login(email, password);
             navigate("/");
         } catch (err) {
-            setError("Session authentication failed. Verify credentials.");
-            console.error(err);
+            console.error("Login error:", err);
+            if (err.code === "auth/user-not-found") {
+                setError("No account found with this identifier. Please sign up.");
+            } else if (err.code === "auth/wrong-password") {
+                setError("Incorrect security key. Access denied.");
+            } else if (err.code === "auth/invalid-credential") {
+                setError("Invalid credentials. Please verify your identifier and key.");
+            } else {
+                setError("Session authentication failed: " + (err.message || "Unknown error"));
+            }
         } finally {
             setLoading(false);
         }
@@ -36,8 +44,16 @@ export default function Login() {
             await googleLogin();
             navigate("/");
         } catch (err) {
-            setError("Google authentication failed.");
-            console.error(err);
+            console.error("Google login error:", err);
+            if (err.code === "auth/account-exists-with-different-credential") {
+                setError("An account already exists with this email using a different login method.");
+            } else if (err.code === "auth/popup-blocked") {
+                setError("Authentication popup was blocked by your browser.");
+            } else if (err.code === "auth/unauthorized-domain") {
+                setError("This domain is not authorized for authentication. Check Firebase Console.");
+            } else {
+                setError("Google authentication failed: " + (err.message || "Unknown error"));
+            }
         } finally {
             setLoading(false);
         }
