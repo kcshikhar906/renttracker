@@ -132,7 +132,7 @@ export default function Layout({ children }) {
                 </header>
 
                 {/* Dynamic Content */}
-                <div className="p-4 md:p-8">
+                <div className="p-4 md:p-8 w-full max-w-full overflow-x-hidden">
                     {children}
                 </div>
             </main>

@@ -96,8 +96,8 @@ export default function ExpenseCharts({ transactions }) {
                         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Last 6 Months</p>
                     </div>
                 </div>
-                <div className="h-[300px] w-full">
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                <div className="h-[300px] w-full relative">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={50}>
                         <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
                             <XAxis
@@ -148,8 +148,8 @@ export default function ExpenseCharts({ transactions }) {
                         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Aggregate Split</p>
                     </div>
                 </div>
-                <div className="h-[300px] w-full">
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                <div className="h-[300px] w-full relative">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={50}>
                         <PieChart>
                             <Pie
                                 data={pieData}
