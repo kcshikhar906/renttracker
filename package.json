@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "start": "sirv dist --single --port 8080 --host",
+    "start": "sirv dist --single --host --port ${PORT:-8080}",
     "lint": "eslint .",
     "preview": "vite preview"
   },
