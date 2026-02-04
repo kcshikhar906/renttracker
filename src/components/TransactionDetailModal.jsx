@@ -64,9 +64,9 @@ export default function TransactionDetailModal({ isOpen, onClose, transaction, o
                                 leaveTo="opacity-0 translate-y-12 scale-95"
                             >
                                 <DialogPanel className="relative transform overflow-hidden rounded-[2.5rem] bg-slate-900 shadow-2xl transition-all w-full max-w-4xl border border-slate-800/50">
-                                    <div className="bg-slate-900 px-6 pt-10 pb-8 sm:p-12">
+                                    <div className="bg-slate-900 px-5 py-8 sm:p-12">
                                         <div className="flex items-center justify-between mb-8">
-                                            <DialogTitle as="h3" className="text-2xl font-black text-white tracking-tight flex items-center gap-4">
+                                            <DialogTitle as="h3" className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-4">
                                                 Transaction Statement
                                             </DialogTitle>
                                             <button onClick={onClose} className="text-slate-500 hover:text-white bg-slate-850 p-3 rounded-2xl transition-all active:scale-90">
@@ -77,28 +77,28 @@ export default function TransactionDetailModal({ isOpen, onClose, transaction, o
                                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                                             {/* Left Side: Info */}
                                             <div className="space-y-8">
-                                                <div className="grid grid-cols-2 gap-8">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
                                                     <div className="space-y-1.5">
                                                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
                                                             <HiOutlineOfficeBuilding className="text-brand" /> Asset Property
                                                         </label>
-                                                        <p className="text-xl font-bold text-slate-100 tracking-tight">{transaction.propertyName}</p>
+                                                        <p className="text-lg sm:text-xl font-bold text-slate-100 tracking-tight">{transaction.propertyName}</p>
                                                     </div>
                                                     <div className="space-y-1.5">
                                                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
                                                             <HiOutlineUserCircle className="text-brand" /> Resident / Tenant
                                                         </label>
-                                                        <p className="text-xl font-bold text-slate-100 tracking-tight">{transaction.tenant || "System Record"}</p>
+                                                        <p className="text-lg sm:text-xl font-bold text-slate-100 tracking-tight">{transaction.tenant || "System Record"}</p>
                                                     </div>
                                                 </div>
 
-                                                <div className="grid grid-cols-2 gap-8">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
                                                     <div className="space-y-1.5">
                                                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
                                                             <HiOutlineCurrencyDollar className="text-brand" /> Total Amount
                                                         </label>
                                                         <div className="flex items-center gap-3">
-                                                            <p className={`text-3xl font-black ${transaction.status === 'PAID' ? 'text-success' : 'text-danger'}`}>
+                                                            <p className={`text-2xl sm:text-3xl font-black ${transaction.status === 'PAID' ? 'text-success' : 'text-danger'}`}>
                                                                 <span className="text-lg mr-0.5">$</span>
                                                                 {transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                                             </p>
@@ -111,7 +111,7 @@ export default function TransactionDetailModal({ isOpen, onClose, transaction, o
                                                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
                                                             <HiOutlineCalendar className="text-brand" /> Filing Date
                                                         </label>
-                                                        <p className="text-xl font-bold text-slate-100 tracking-tight">{safeFormat(transaction.date, "MMMM dd, yyyy")}</p>
+                                                        <p className="text-lg sm:text-xl font-bold text-slate-100 tracking-tight">{safeFormat(transaction.date, "MMMM dd, yyyy")}</p>
                                                     </div>
                                                 </div>
 
@@ -225,7 +225,7 @@ export default function TransactionDetailModal({ isOpen, onClose, transaction, o
                                             </div>
                                         </div>
 
-                                        <div className="mt-12 flex items-center gap-4 pt-8 border-t border-slate-800">
+                                        <div className="mt-12 flex flex-col sm:flex-row items-center gap-4 pt-8 border-t border-slate-800">
                                             <button
                                                 onClick={() => {
                                                     if (window.confirm("ARE YOU SURE? THIS WILL PERMANENTLY ERASE THE RECORD.")) {
@@ -233,14 +233,14 @@ export default function TransactionDetailModal({ isOpen, onClose, transaction, o
                                                         onClose();
                                                     }
                                                 }}
-                                                className="flex items-center gap-2 px-8 py-5 bg-danger/5 text-danger border border-danger/20 rounded-[1.5rem] font-black text-[10px] uppercase tracking-[0.2em] hover:bg-danger hover:text-white transition-all shadow-lg active:scale-95"
+                                                className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-5 bg-danger/5 text-danger border border-danger/20 rounded-[1.5rem] font-black text-[10px] uppercase tracking-[0.2em] hover:bg-danger hover:text-white transition-all shadow-lg active:scale-95"
                                             >
                                                 <HiOutlineTrash className="text-lg" />
-                                                Erase Ledger Entry
+                                                Erase Record
                                             </button>
                                             <button
                                                 onClick={onClose}
-                                                className="flex-1 py-5 bg-slate-800 text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-[0.2em] hover:bg-slate-700 transition-all shadow-lg active:scale-95"
+                                                className="w-full sm:flex-1 py-5 bg-slate-800 text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-[0.2em] hover:bg-slate-700 transition-all shadow-lg active:scale-95"
                                             >
                                                 Return to Ledger
                                             </button>

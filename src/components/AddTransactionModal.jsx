@@ -278,7 +278,7 @@ export default function AddTransactionModal({ isOpen, onClose }) {
                             leaveTo="opacity-0 translate-y-12 scale-95"
                         >
                             <DialogPanel className="relative transform overflow-hidden rounded-[2.5rem] bg-slate-900 shadow-2xl transition-all w-full max-w-2xl border border-slate-800/50">
-                                <div className="bg-slate-900 px-6 pt-10 pb-8 sm:p-12">
+                                <div className="bg-slate-900 px-5 py-8 sm:p-12">
                                     <div className="flex items-center justify-between mb-10">
                                         <DialogTitle as="h3" className="text-3xl font-black text-white tracking-tight flex items-center gap-4">
                                             <div className="p-3 bg-brand rounded-2xl shadow-lg shadow-brand/20">
@@ -384,7 +384,7 @@ export default function AddTransactionModal({ isOpen, onClose }) {
                                                 </div>
 
                                                 {/* Summary Box */}
-                                                <div className="bg-slate-950 rounded-[2.5rem] p-8 border border-slate-800 shadow-inner flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative group">
+                                                <div className="bg-slate-950 rounded-[2rem] sm:rounded-[2.5rem] p-5 sm:p-8 border border-slate-800 shadow-inner flex flex-col items-center justify-between gap-6 overflow-hidden relative group">
                                                     <div className="absolute top-0 right-0 p-4 opacity-10">
                                                         <HiOutlineClock className="text-8xl text-brand" />
                                                     </div>
@@ -398,7 +398,7 @@ export default function AddTransactionModal({ isOpen, onClose }) {
                                                     </div>
                                                     <div className="relative z-10 text-center md:text-right border-t md:border-t-0 md:border-l border-slate-800 pt-6 md:pt-0 md:pl-8">
                                                         <p className="text-[10px] font-black text-brand uppercase tracking-[0.2em] mb-3">Total Settlement</p>
-                                                        <p className="text-4xl font-black text-white leading-none tracking-tight">
+                                                        <p className="text-3xl sm:text-4xl font-black text-white leading-none tracking-tight">
                                                             <span className="text-brand mr-1">$</span>
                                                             {totalAmount.toLocaleString()}
                                                         </p>

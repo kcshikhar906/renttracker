@@ -221,7 +221,7 @@ export default function ImportModal({ isOpen, onClose, user, properties }) {
                             leaveFrom="opacity-100 scale-100"
                             leaveTo="opacity-0 scale-95"
                         >
-                            <DialogPanel className="w-full max-w-2xl transform overflow-hidden rounded-[2.5rem] bg-slate-900 border border-slate-800 p-8 shadow-2xl transition-all">
+                            <DialogPanel className="w-full max-w-2xl transform overflow-hidden rounded-[2.5rem] bg-slate-900 border border-slate-800 p-5 sm:p-8 shadow-2xl transition-all">
                                 <div className="flex items-center justify-between mb-8">
                                     <DialogTitle as="h3" className="text-2xl font-black text-white uppercase tracking-tighter">
                                         Import Transactions
@@ -286,8 +286,8 @@ export default function ImportModal({ isOpen, onClose, user, properties }) {
                                         {previewData.length > 0 && (
                                             <div className="space-y-3">
                                                 <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Preview (First 5 records)</h4>
-                                                <div className="overflow-hidden border border-slate-800 rounded-2xl">
-                                                    <table className="w-full text-left text-[10px]">
+                                                <div className="overflow-x-auto border border-slate-800 rounded-2xl">
+                                                    <table className="w-full text-left text-[10px] min-w-[500px]">
                                                         <thead className="bg-slate-950/50 text-slate-500 border-b border-slate-800">
                                                             <tr>
                                                                 <th className="px-4 py-3 font-black uppercase">Date</th>
@@ -328,17 +328,17 @@ export default function ImportModal({ isOpen, onClose, user, properties }) {
                                             </div>
                                         )}
 
-                                        <div className="pt-4 flex gap-4">
+                                        <div className="pt-4 flex flex-col sm:flex-row gap-4">
                                             <button
                                                 onClick={onClose}
-                                                className="flex-1 py-4 bg-slate-800 text-slate-300 font-black uppercase tracking-widest rounded-2xl hover:bg-slate-700 transition-all"
+                                                className="w-full sm:flex-1 py-4 bg-slate-800 text-slate-300 font-black uppercase tracking-widest rounded-2xl hover:bg-slate-700 transition-all order-2 sm:order-1"
                                             >
                                                 Cancel
                                             </button>
                                             <button
                                                 onClick={handleImport}
                                                 disabled={!file || importing}
-                                                className="flex-2 px-12 py-4 bg-success text-white font-black uppercase tracking-widest rounded-2xl hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:hover:scale-100 transition-all shadow-xl shadow-success/20"
+                                                className="w-full sm:flex-2 px-12 py-4 bg-success text-white font-black uppercase tracking-widest rounded-2xl hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:hover:scale-100 transition-all shadow-xl shadow-success/20 order-1 sm:order-2"
                                             >
                                                 {importing ? "Processing..." : "Start Import"}
                                             </button>

@@ -519,7 +519,7 @@ export default function Transactions() {
                                 leaveFrom="opacity-100 scale-100"
                                 leaveTo="opacity-0 scale-95"
                             >
-                                <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-[2.5rem] bg-slate-900 border border-slate-800 p-8 shadow-2xl transition-all">
+                                <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-[2.5rem] bg-slate-900 border border-slate-800 p-5 sm:p-8 shadow-2xl transition-all">
                                     <div className="flex items-center justify-between mb-8">
                                         <DialogTitle as="h3" className="text-xl font-black text-white uppercase tracking-tighter">
                                             Select Export Name
@@ -589,7 +589,7 @@ export default function Transactions() {
                                 leaveFrom="opacity-100 scale-100"
                                 leaveTo="opacity-0 scale-95"
                             >
-                                <DialogPanel className="w-full max-w-lg transform overflow-hidden rounded-[2.5rem] bg-slate-900 border border-slate-800 p-8 shadow-2xl transition-all">
+                                <DialogPanel className="w-full max-w-lg transform overflow-hidden rounded-[2.5rem] bg-slate-900 border border-slate-800 p-5 sm:p-8 shadow-2xl transition-all">
                                     <div className="flex items-center justify-between mb-8">
                                         <DialogTitle as="h3" className="text-xl font-black text-white uppercase tracking-tighter">
                                             Report Configuration

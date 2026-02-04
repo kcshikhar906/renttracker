@@ -336,9 +336,9 @@ export default function Settings() {
                             </div>
 
                             {showAddForm && (
-                                <div className="stats-card p-8 border-brand/30 ring-1 ring-brand/10 bg-slate-950/40">
+                                <div className="stats-card p-5 sm:p-8 border-brand/30 ring-1 ring-brand/10 bg-slate-950/40">
                                     <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-800">
-                                        <h3 className="text-xl font-bold text-slate-100 flex items-center gap-3">
+                                        <h3 className="text-lg sm:text-xl font-bold text-slate-100 flex items-center gap-3">
                                             <div className="p-2 bg-brand/10 rounded-lg text-brand">
                                                 <HiOutlineHome />
                                             </div>
@@ -349,7 +349,7 @@ export default function Settings() {
                                         </button>
                                     </div>
                                     <form onSubmit={handleSubmit} className="space-y-8">
-                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
                                             <div className="space-y-8">
                                                 <div className="space-y-2">
                                                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Unique Property Name</label>
@@ -408,9 +408,9 @@ export default function Settings() {
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="flex justify-end gap-4 pt-8 mt-12 border-t border-slate-800">
-                                            <button type="button" onClick={resetForm} className="btn-ghost px-10">Discard</button>
-                                            <button type="submit" className="btn-primary py-5 px-16 text-[10px] font-black uppercase tracking-widest">SAVE ASSET</button>
+                                        <div className="flex flex-col sm:flex-row justify-end gap-4 pt-8 mt-12 border-t border-slate-800">
+                                            <button type="button" onClick={resetForm} className="btn-ghost px-10 order-2 sm:order-1">Discard</button>
+                                            <button type="submit" className="btn-primary py-5 px-16 text-[10px] font-black uppercase tracking-widest order-1 sm:order-2">SAVE ASSET</button>
                                         </div>
                                     </form>
                                 </div>
