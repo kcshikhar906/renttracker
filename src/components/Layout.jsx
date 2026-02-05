@@ -13,15 +13,11 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import AddTransactionModal from "./AddTransactionModal";
 
-const ALLOWED_EMAILS = ["shikharkc63@gmail.com"];
-
 export default function Layout({ children }) {
     const { logout, currentUser } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
     const [isModalOpen, setIsModalOpen] = useState(false);
-
-    const isAllowed = currentUser && ALLOWED_EMAILS.includes(currentUser.email);
 
     const navItems = [
         { name: "Overview", path: "/", icon: HiOutlineHome },
@@ -37,29 +33,6 @@ export default function Layout({ children }) {
             console.error("Logout error", err);
         }
     };
-
-    if (!isAllowed) {
-        return (
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 text-center">
-                <div className="max-w-md w-full">
-                    <div className="w-20 h-20 bg-danger/10 border border-danger/20 rounded-3xl flex items-center justify-center mx-auto mb-8">
-                        <HiOutlineShieldExclamation className="text-4xl text-danger" />
-                    </div>
-                    <h1 className="text-3xl font-bold text-slate-100 mb-4 tracking-tight">Access Denied</h1>
-                    <p className="text-slate-500 mb-8 leading-relaxed">
-                        Your account ({currentUser?.email}) is not authorized to access this private financial ledger. Please contact the administrator for permission.
-                    </p>
-                    <button
-                        onClick={handleLogout}
-                        className="btn-primary w-full py-4 gap-2"
-                    >
-                        <HiOutlineLogout className="text-xl" />
-                        Switch Account
-                    </button>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className="flex min-h-screen bg-slate-950 text-slate-200">

@@ -74,7 +74,7 @@ export default function EditTransactionModal({ isOpen, onClose, transaction }) {
         if (isOpen && currentUser) {
             async function fetchProperties() {
                 try {
-                    const q = query(collection(db, "properties"), where("uid", "==", currentUser.uid));
+                    const q = query(collection(db, "users", currentUser.uid, "properties"));
                     const snap = await getDocs(q);
                     const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     setProperties(data);
@@ -145,7 +145,7 @@ export default function EditTransactionModal({ isOpen, onClose, transaction }) {
                 updatedData.utilityType = utilityType;
             }
 
-            await updateDoc(doc(db, "transactions", transaction.id), updatedData);
+            await updateDoc(doc(db, "users", currentUser.uid, "transactions", transaction.id), updatedData);
 
             setSuccess(true);
             setTimeout(() => {

@@ -229,7 +229,7 @@ export default function TransactionDetailModal({ isOpen, onClose, transaction, o
                                             <button
                                                 onClick={() => {
                                                     if (window.confirm("ARE YOU SURE? THIS WILL PERMANENTLY ERASE THE RECORD.")) {
-                                                        onDelete(transaction.id);
+                                                        onDelete(transaction);
                                                         onClose();
                                                     }
                                                 }}

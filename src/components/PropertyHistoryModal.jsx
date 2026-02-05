@@ -22,8 +22,7 @@ export default function PropertyHistoryModal({ isOpen, onClose, property, curren
         if (isOpen && property && currentUser) {
             setLoading(true);
             const q = query(
-                collection(db, "transactions"),
-                where("uid", "==", currentUser.uid),
+                collection(db, "users", currentUser.uid, "transactions"),
                 where("propertyId", "==", property.id),
                 orderBy("date", "desc")
             );

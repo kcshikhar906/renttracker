@@ -4,13 +4,15 @@ import { useAuth } from "../contexts/AuthContext";
 import { motion } from "framer-motion";
 import { HiOutlineLogin, HiOutlineMail, HiOutlineLockClosed, HiOutlineExclamationCircle } from "react-icons/hi";
 import { FcGoogle } from "react-icons/fc";
+import { db } from "../firebase";
+import { doc, getDoc, setDoc, serverTimestamp, collection, query, limit, getDocs } from "firebase/firestore";
 
 export default function Login() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
-    const { login, googleLogin } = useAuth();
+    const { login, googleLogin, logout } = useAuth();
     const navigate = useNavigate();
 
     async function handleSubmit(e) {
@@ -41,19 +43,52 @@ export default function Login() {
         try {
             setError("");
             setLoading(true);
-            await googleLogin();
+            const userCredential = await googleLogin();
+            const email = userCredential.user.email.toLowerCase();
+            const uid = userCredential.user.uid;
+
+            // 🔍 Authorization Check
+            const userDoc = await getDoc(doc(db, "users", uid));
+            if (userDoc.exists()) {
+                // Regular user, proceed
+                navigate("/");
+                return;
+            }
+
+            // New user trying to join via Google - check whitelist
+            const inviteDoc = await getDoc(doc(db, "whitelists", email));
+
+            // Check if system is empty (First user bypass)
+            const whitelistSnap = await getDocs(query(collection(db, "whitelists"), limit(1)));
+            const isWhitelistEmpty = whitelistSnap.empty;
+
+            if (!inviteDoc.exists() && !isWhitelistEmpty) {
+                // Not authorized - sign them out immediately
+                await logout();
+                throw new Error("Your account is not on the authorized guest list. Please contact the administrator.");
+            }
+
+            // Provision them as a new user since they are whitelisted (or it's the first run)
+            await setDoc(doc(db, "users", uid), {
+                email: email,
+                role: (isWhitelistEmpty || inviteDoc.data()?.role === "admin") ? "admin" : "user",
+                createdAt: serverTimestamp(),
+                lastLogin: serverTimestamp()
+            });
+
+            // If first run, whitelist them too
+            if (isWhitelistEmpty) {
+                await setDoc(doc(db, "whitelists", email), {
+                    role: "admin",
+                    invitedBy: "system",
+                    invitedAt: serverTimestamp()
+                });
+            }
+
             navigate("/");
         } catch (err) {
             console.error("Google login error:", err);
-            if (err.code === "auth/account-exists-with-different-credential") {
-                setError("An account already exists with this email using a different login method.");
-            } else if (err.code === "auth/popup-blocked") {
-                setError("Authentication popup was blocked by your browser.");
-            } else if (err.code === "auth/unauthorized-domain") {
-                setError("This domain is not authorized for authentication. Check Firebase Console.");
-            } else {
-                setError("Google authentication failed: " + (err.message || "Unknown error"));
-            }
+            setError(err.message || "Google authentication failed.");
         } finally {
             setLoading(false);
         }

@@ -35,8 +35,7 @@ export default function DocumentUploadModal({ isOpen, onClose, properties, curre
 
             const propertyName = propertyId ? properties.find(p => p.id === propertyId)?.name : "General / Multiple";
 
-            await addDoc(collection(db, "documents"), {
-                uid: currentUser.uid,
+            await addDoc(collection(db, "users", currentUser.uid, "documents"), {
                 name: file.name,
                 type: docType,
                 propertyId: propertyId || null,

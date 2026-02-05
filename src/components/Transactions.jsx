@@ -68,8 +68,8 @@ export default function Transactions() {
 
         // Fetch Properties & Profiles for filter/export
         const fetchData = async () => {
-            const qProps = query(collection(db, "properties"), where("uid", "==", user.uid));
-            const qProfs = query(collection(db, "profiles"), where("uid", "==", user.uid));
+            const qProps = query(collection(db, "users", user.uid, "properties"));
+            const qProfs = query(collection(db, "users", user.uid, "profiles"));
 
             const [snapProps, snapProfs] = await Promise.all([getDocs(qProps), getDocs(qProfs)]);
 
@@ -79,8 +79,7 @@ export default function Transactions() {
         fetchData();
 
         const q = query(
-            collection(db, "transactions"),
-            where("uid", "==", user.uid),
+            collection(db, "users", user.uid, "transactions"),
             orderBy("date", "desc")
         );
 
@@ -172,7 +171,7 @@ export default function Transactions() {
     const confirmDelete = async () => {
         if (!transactionToDelete) return;
         try {
-            await updateDoc(doc(db, "transactions", transactionToDelete.id), {
+            await updateDoc(doc(db, "users", user.uid, "transactions", transactionToDelete.id), {
                 isDeleted: true
             });
             setIsDeleteModalOpen(false);

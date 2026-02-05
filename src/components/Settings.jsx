@@ -90,8 +90,8 @@ export default function Settings() {
     useEffect(() => {
         if (!currentUser) return;
 
-        const qProps = query(collection(db, "properties"), where("uid", "==", currentUser.uid));
-        const qProfs = query(collection(db, "profiles"), where("uid", "==", currentUser.uid));
+        const qProps = query(collection(db, "users", currentUser.uid, "properties"));
+        const qProfs = query(collection(db, "users", currentUser.uid, "profiles"));
 
         const unsubProps = onSnapshot(qProps, (snapshot) => {
             setProperties(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -104,8 +104,7 @@ export default function Settings() {
 
         // Fetch Archived Transactions
         const qArchived = query(
-            collection(db, "transactions"),
-            where("uid", "==", currentUser.uid),
+            collection(db, "users", currentUser.uid, "transactions"),
             where("isDeleted", "==", true)
         );
 
@@ -114,7 +113,7 @@ export default function Settings() {
         });
 
         // Fetch Documents
-        const qDocs = query(collection(db, "documents"), where("uid", "==", currentUser.uid));
+        const qDocs = query(collection(db, "users", currentUser.uid, "documents"));
         const unsubDocs = onSnapshot(qDocs, (snapshot) => {
             setDocuments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         });
@@ -168,8 +167,7 @@ export default function Settings() {
     const handleAddProfile = async () => {
         if (!profileInput.trim()) return;
         try {
-            await addDoc(collection(db, "profiles"), {
-                uid: currentUser.uid,
+            await addDoc(collection(db, "users", currentUser.uid, "profiles"), {
                 name: profileInput.trim(),
                 createdAt: Timestamp.now()
             });
@@ -182,7 +180,7 @@ export default function Settings() {
     const handleDeleteProfile = async (id) => {
         if (!window.confirm("Remove this report profile?")) return;
         try {
-            await deleteDoc(doc(db, "profiles", id));
+            await deleteDoc(doc(db, "users", currentUser.uid, "profiles", id));
         } catch (err) {
             console.error(err);
         }
@@ -190,7 +188,7 @@ export default function Settings() {
 
     const handleRestore = async (id) => {
         try {
-            await updateDoc(doc(db, "transactions", id), {
+            await updateDoc(doc(db, "users", currentUser.uid, "transactions", id), {
                 isDeleted: false
             });
         } catch (err) {
@@ -205,7 +203,7 @@ export default function Settings() {
         try {
             const storageRef = ref(storage, docObj.storagePath);
             await deleteObject(storageRef);
-            await deleteDoc(doc(db, "documents", docObj.id));
+            await deleteDoc(doc(db, "users", currentUser.uid, "documents", docObj.id));
         } catch (err) {
             console.error("Delete failed:", err);
         }
@@ -257,7 +255,6 @@ export default function Settings() {
             updatedHistory.sort((a, b) => b.effectiveDate.seconds - a.effectiveDate.seconds);
 
             const payload = {
-                uid: currentUser.uid,
                 name: formData.name,
                 rentAmount: newAmount,
                 tenantNames: formData.tenantNames,
@@ -266,9 +263,9 @@ export default function Settings() {
             };
 
             if (editingId) {
-                await updateDoc(doc(db, "properties", editingId), payload);
+                await updateDoc(doc(db, "users", currentUser.uid, "properties", editingId), payload);
             } else {
-                await addDoc(collection(db, "properties"), payload);
+                await addDoc(collection(db, "users", currentUser.uid, "properties"), payload);
             }
 
             resetForm();
@@ -283,7 +280,7 @@ export default function Settings() {
     async function handleDelete(id) {
         if (window.confirm("Are you sure? This will delete the property record.")) {
             try {
-                await deleteDoc(doc(db, "properties", id));
+                await deleteDoc(doc(db, "users", currentUser.uid, "properties", id));
             } catch (err) {
                 console.error(err);
             }

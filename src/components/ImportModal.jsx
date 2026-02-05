@@ -142,9 +142,8 @@ export default function ImportModal({ isOpen, onClose, user, properties }) {
                     const chunk = allTransactions.slice(i, i + batchSize);
 
                     chunk.forEach(t => {
-                        const docRef = doc(collection(db, "transactions"));
+                        const docRef = doc(collection(db, "users", user.uid, "transactions"));
                         const dataToSave = {
-                            uid: user.uid,
                             date: Timestamp.fromDate(t.date),
                             amount: t.amount,
                             type: t.type,

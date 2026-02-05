@@ -79,8 +79,7 @@ export default function Dashboard() {
         if (!user) return;
 
         const q = query(
-            collection(db, "transactions"),
-            where("uid", "==", user.uid),
+            collection(db, "users", user.uid, "transactions"),
             orderBy("date", "desc")
         );
 
@@ -107,7 +106,7 @@ export default function Dashboard() {
         });
 
         // Fetch Properties
-        const qProps = query(collection(db, "properties"), where("uid", "==", user.uid));
+        const qProps = query(collection(db, "users", user.uid, "properties"));
         const unsubscribeProps = onSnapshot(qProps, (snapshot) => {
             setProperties(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }, (err) => {
@@ -142,21 +141,29 @@ export default function Dashboard() {
         if (!user) return;
         try {
             setIsProcessingSetup(true);
-            await setDoc(doc(db, "whitelists", user.email.toLowerCase()), {
+            const userEmail = user.email.toLowerCase();
+
+            // 1. First, establish the user as an Admin in the 'users' collection
+            await setDoc(doc(db, "users", user.uid), {
+                email: userEmail,
+                role: "admin",
+                createdAt: serverTimestamp(),
+                lastLogin: serverTimestamp()
+            });
+
+            // 2. Then, provision them in the 'whitelists' to authorized future access
+            await setDoc(doc(db, "whitelists", userEmail), {
                 role: "admin",
                 invitedBy: "system",
                 invitedAt: serverTimestamp()
             });
-            await setDoc(doc(db, "users", user.uid), {
-                email: user.email.toLowerCase(),
-                role: "admin",
-                createdAt: serverTimestamp()
-            });
+
             setNeedsSetup(false);
-            alert("System Initialized. You are now the Administrator.");
+            alert("System Initialized! You now have Administrative privileges.");
+            // Force a reload of the profile in local state if needed (snapshot will handle it)
         } catch (err) {
-            console.error(err);
-            alert("Setup failed: Permission denied.");
+            console.error("Setup sequence failed:", err);
+            alert("Setup failed: " + (err.message || "Permission restricted. Check rules."));
         } finally {
             setIsProcessingSetup(false);
         }
@@ -165,7 +172,7 @@ export default function Dashboard() {
     const confirmDelete = async () => {
         if (!transactionToDelete) return;
         try {
-            await updateDoc(doc(db, "transactions", transactionToDelete.id), {
+            await updateDoc(doc(db, "users", user.uid, "transactions", transactionToDelete.id), {
                 isDeleted: true
             });
             setIsDeleteModalOpen(false);

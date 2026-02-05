@@ -59,17 +59,15 @@ export default function AddTransactionModal({ isOpen, onClose }) {
     // Fetch properties
     useEffect(() => {
         if (isOpen && currentUser) {
-            async function fetchProperties() {
-                try {
-                    const q = query(collection(db, "properties"), where("uid", "==", currentUser.uid));
-                    const snap = await getDocs(q);
-                    const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    setProperties(data);
-                } catch (err) {
-                    console.error("Error fetching properties:", err);
-                }
-            }
-            fetchProperties();
+            const q = query(collection(db, "users", currentUser.uid, "properties"));
+            const unsubscribe = onSnapshot(q, (snapshot) => {
+                const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setProperties(data);
+            }, (error) => {
+                console.error("Error fetching properties:", error);
+            });
+
+            return () => unsubscribe(); // Cleanup listener on unmount or if dependencies change
         }
     }, [isOpen, currentUser]);
 
@@ -84,8 +82,7 @@ export default function AddTransactionModal({ isOpen, onClose }) {
             async function fetchLastTx() {
                 try {
                     const q = query(
-                        collection(db, "transactions"),
-                        where("uid", "==", currentUser.uid),
+                        collection(db, "users", currentUser.uid, "transactions"),
                         where("propertyId", "==", selectedPropertyId),
                         orderBy("periodEnd", "desc"),
                         limit(1)
@@ -108,7 +105,7 @@ export default function AddTransactionModal({ isOpen, onClose }) {
         } else {
             setLastTxHistory(null);
         }
-    }, [selectedPropertyId, type]);
+    }, [selectedPropertyId, type, currentUser]);
 
     // Calculate Period Start
     const periodStart = useMemo(() => {
@@ -288,8 +285,7 @@ export default function AddTransactionModal({ isOpen, onClose }) {
             const startD = parseISO(periodStart);
             const endD = parseISO(periodEnd);
 
-            const transactionData = {
-                uid: currentUser.uid,
+            const payload = {
                 propertyId: selectedPropertyId || null,
                 propertyName: selectedProperty?.name || "Manual/Other",
                 type,
@@ -305,10 +301,16 @@ export default function AddTransactionModal({ isOpen, onClose }) {
                 startDate: type === "RENT" && isValid(startD) ? Timestamp.fromDate(startD) : null,
                 endDate: type === "RENT" && isValid(endD) ? Timestamp.fromDate(endD) : null,
                 fileUrl: fileUrl || null,
-                createdAt: serverTimestamp(),
             };
 
-            await addDoc(collection(db, "transactions"), transactionData);
+            const finalPayload = {
+                ...payload,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+                isDeleted: false
+            };
+
+            await addDoc(collection(db, "users", currentUser.uid, "transactions"), finalPayload);
 
             setSuccess(true);
             setTimeout(() => {

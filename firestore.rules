@@ -1,42 +1,35 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /transactions/{transactionId} {
-      allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.uid;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;
-    }
+    match /users/{userId} {
+      allow read, update: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId;
 
-    match /properties/{propertyId} {
-      // Allow read/update/delete only if user owns the document
-      allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.uid;
-      
-      // Allow create only if user is authenticated and sets themselves as the owner
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;
-    }
+      // --- USER SUB-COLLECTIONS ---
 
-    match /profiles/{profileId} {
-      allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.uid;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;
-    }
+      match /transactions/{transactionId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
 
-    match /documents/{docId} {
-      allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.uid;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;
+      match /properties/{propertyId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      match /profiles/{profileId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      match /documents/{docId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
     }
 
     match /whitelists/{email} {
-      // Allowed so users can check if their email is authorized during signup
       allow read: if true;
-      // Only admins can invite/edit the guest list
-      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      allow write: if request.auth != null && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+        (request.resource.data.invitedBy == 'system' && email == request.auth.token.email.lower())
+      );
     }
-
-    match /users/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      // Allow creation during signup, but role must be checked or default to user
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow update: if request.auth != null && request.auth.uid == userId;
-    }
-
   }
 }
