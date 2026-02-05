@@ -3,6 +3,17 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { motion } from "framer-motion";
 import { HiOutlineUserAdd, HiOutlineMail, HiOutlineLockClosed, HiOutlineExclamationCircle } from "react-icons/hi";
+import { db } from "../firebase";
+import {
+    collection,
+    doc,
+    getDoc,
+    getDocs,
+    setDoc,
+    serverTimestamp,
+    query,
+    limit
+} from "firebase/firestore";
 
 export default function Signup() {
     const [email, setEmail] = useState("");
@@ -23,11 +34,47 @@ export default function Signup() {
         try {
             setError("");
             setLoading(true);
-            await signup(email, password);
+
+            // 🔍 Verification: Check if the user is on the Global Invitation List
+            const inviteDoc = await getDoc(doc(db, "whitelists", email.toLowerCase()));
+
+            // EMERGENCY BYPASS: If there are ZERO people in the whitelist, the first user becomes Admin.
+            const whitelistSnap = await getDocs(query(collection(db, "whitelists"), limit(1)));
+            const isWhitelistEmpty = whitelistSnap.empty;
+
+            if (!inviteDoc.exists() && !isWhitelistEmpty) {
+                throw new Error("This email is not on the authorized guest list. Please contact the administrator.");
+            }
+
+            const userCredential = await signup(email, password);
+
+            // Initialize User Profile in Firestore
+            await setDoc(doc(db, "users", userCredential.user.uid), {
+                email: email.toLowerCase(),
+                role: (isWhitelistEmpty || inviteDoc.data()?.role === "admin") ? "admin" : "user",
+                createdAt: serverTimestamp(),
+                lastLogin: serverTimestamp()
+            });
+
+            // If they are the first user, add them to the whitelist as well
+            if (isWhitelistEmpty) {
+                await setDoc(doc(db, "whitelists", email.toLowerCase()), {
+                    role: "admin",
+                    invitedBy: "system",
+                    invitedAt: serverTimestamp()
+                });
+            }
+
             navigate("/");
         } catch (err) {
-            setError("Account provisioning failed. " + err.message);
-            console.error(err);
+            console.error("Signup error:", err);
+            let userMessage = err.message;
+            if (err.code === "auth/email-already-in-use") {
+                userMessage = "An account already exists with this identifier.";
+            } else if (err.code === "auth/weak-password") {
+                userMessage = "Security key is too weak. Use a stronger sequence.";
+            }
+            setError("Account provisioning failed. " + userMessage);
         } finally {
             setLoading(false);
         }

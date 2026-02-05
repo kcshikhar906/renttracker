@@ -24,5 +24,19 @@ service cloud.firestore {
       allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;
     }
 
+    match /whitelists/{email} {
+      // Allowed so users can check if their email is authorized during signup
+      allow read: if true;
+      // Only admins can invite/edit the guest list
+      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      // Allow creation during signup, but role must be checked or default to user
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && request.auth.uid == userId;
+    }
+
   }
 }
