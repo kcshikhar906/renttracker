@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import Layout from "./Layout";
 import { useAuth } from "../contexts/AuthContext";
-import { db } from "../firebase";
+import { db, storage, auth } from "../firebase";
 import {
     collection,
     query,
@@ -11,9 +11,12 @@ import {
     updateDoc,
     deleteDoc,
     doc,
-    Timestamp
+    Timestamp,
+    getDocs,
+    orderBy,
+    serverTimestamp,
+    writeBatch
 } from "firebase/firestore";
-import { storage } from "../firebase";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import {
     HiOutlineHome,
@@ -27,10 +30,13 @@ import {
     HiOutlineCalendar,
     HiOutlineRefresh,
     HiOutlineDocumentText,
-    HiOutlineDownload
+    HiOutlineDownload,
+    HiOutlineSearchCircle
 } from "react-icons/hi";
+import PropertyHistoryModal from "./PropertyHistoryModal";
+import DocumentUploadModal from "./DocumentUploadModal";
 import { motion, AnimatePresence } from "framer-motion";
-import { format, parseISO, isValid } from "date-fns";
+import { format, parseISO, isValid, isBefore, addDays } from "date-fns";
 
 export default function Settings() {
     const { currentUser } = useAuth();
@@ -45,6 +51,13 @@ export default function Settings() {
     // Property Form State
     const [showAddForm, setShowAddForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
+    const [selectedPropertyForHistory, setSelectedPropertyForHistory] = useState(null);
+    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+    const [isDocModalOpen, setIsDocModalOpen] = useState(false);
+
+    // Document Filter State
+    const [docSearch, setDocSearch] = useState("");
+    const [docFilter, setDocFilter] = useState("ALL");
     const [tenantInput, setTenantInput] = useState("");
     const [profileInput, setProfileInput] = useState("");
     const [formData, setFormData] = useState({
@@ -128,36 +141,7 @@ export default function Settings() {
         }
     };
 
-    const handleUploadDocument = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const docType = prompt("Document Type? (e.g., Lease, Bond, Receipt)", "Lease") || "Other";
-
-        setUploadingDoc(true);
-        try {
-            const fileName = `${Date.now()}_${file.name}`;
-            const storagePath = `documents/${currentUser.uid}/${fileName}`;
-            const storageRef = ref(storage, storagePath);
-
-            await uploadBytes(storageRef, file);
-            const downloadUrl = await getDownloadURL(storageRef);
-
-            await addDoc(collection(db, "documents"), {
-                uid: currentUser.uid,
-                name: file.name,
-                type: docType,
-                url: downloadUrl,
-                storagePath,
-                uploadedAt: Timestamp.now()
-            });
-        } catch (err) {
-            console.error("Upload failed:", err);
-            alert("Document upload failed.");
-        } finally {
-            setUploadingDoc(false);
-        }
-    };
+    // Cleaned up handleUploadDocument as it's now in the Modal component
 
     const handleDeleteDocument = async (docObj) => {
         if (!window.confirm("Delete this document?")) return;
@@ -425,6 +409,16 @@ export default function Settings() {
                                                 <HiOutlineHome className="text-2xl" />
                                             </div>
                                             <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedPropertyForHistory(p);
+                                                        setIsHistoryOpen(true);
+                                                    }}
+                                                    className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-brand hover:text-white hover:bg-brand transition-all shadow-sm"
+                                                    title="View History"
+                                                >
+                                                    <HiOutlineSearchCircle className="text-lg" />
+                                                </button>
                                                 <button onClick={() => handleEdit(p)} className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-500 hover:text-white hover:border-brand/50 transition-all shadow-sm"><HiOutlinePencilAlt /></button>
                                                 <button onClick={() => handleDelete(p.id)} className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-500 hover:text-danger hover:border-danger/30 transition-all shadow-sm"><HiOutlineTrash /></button>
                                             </div>
@@ -502,50 +496,119 @@ export default function Settings() {
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -10 }}
-                            className="space-y-12"
+                            className="space-y-8"
                         >
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-8 border-b border-slate-800/50">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-800/50">
                                 <div>
                                     <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Document Vault</h3>
-                                    <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px] mt-1">Lifecycle Compliance & Lease Agreements</p>
+                                    <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px] mt-1 flex items-center gap-2">
+                                        <HiOutlineClock className="text-brand text-xs" /> Compliance Lifecycle & Lease Management
+                                    </p>
                                 </div>
-                                <label className="flex items-center gap-3 px-8 py-4 bg-brand text-white font-black uppercase tracking-widest rounded-2xl hover:scale-[1.02] active:scale-95 transition-all cursor-pointer shadow-xl shadow-brand/20">
+                                <button
+                                    onClick={() => setIsDocModalOpen(true)}
+                                    className="flex items-center gap-3 px-8 py-4 bg-brand text-white font-black uppercase tracking-widest rounded-2xl hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-brand/20"
+                                >
                                     <HiOutlinePlus className="text-xl" />
-                                    {uploadingDoc ? "Uploading..." : "Upload Document"}
-                                    <input type="file" className="hidden" onChange={handleUploadDocument} disabled={uploadingDoc} accept=".pdf,image/*" />
-                                </label>
+                                    Secure New Document
+                                </button>
+                            </div>
+
+                            {/* Document Filter Bar */}
+                            <div className="flex flex-wrap items-center gap-4 bg-slate-950/40 p-2 rounded-2xl border border-slate-800/50">
+                                <div className="flex-1 relative min-w-[200px]">
+                                    <HiOutlineSearchCircle className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-lg" />
+                                    <input
+                                        className="input-field pl-12 py-3 bg-transparent border-none text-[11px]"
+                                        placeholder="Search by document name..."
+                                        value={docSearch}
+                                        onChange={(e) => setDocSearch(e.target.value)}
+                                    />
+                                </div>
+                                <select
+                                    className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 outline-none focus:border-brand/40"
+                                    value={docFilter}
+                                    onChange={(e) => setDocFilter(e.target.value)}
+                                >
+                                    <option value="ALL">ALL TYPES</option>
+                                    <option value="LEASE">LEASE AGREEMENTS</option>
+                                    <option value="INSURANCE">INSURANCE</option>
+                                    <option value="BOND">BOND</option>
+                                    <option value="TAX">TAX</option>
+                                </select>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {documents.length === 0 ? (
+                                {documents
+                                    .filter(d => (docFilter === 'ALL' || d.type === docFilter) && d.name.toLowerCase().includes(docSearch.toLowerCase()))
+                                    .length === 0 ? (
                                     <div className="col-span-full py-32 text-center rounded-[3rem] border-2 border-dashed border-slate-800 bg-slate-900/20">
                                         <HiOutlineDocumentText className="text-7xl text-slate-800 mx-auto mb-6 opacity-20" />
-                                        <p className="text-slate-500 font-medium uppercase tracking-widest text-[10px]">No lease agreements or bond receipts found.</p>
+                                        <p className="text-slate-500 font-medium uppercase tracking-widest text-[10px]">No compliance records matching filters.</p>
                                     </div>
                                 ) : (
-                                    documents.map(docObj => (
-                                        <div key={docObj.id} className="stats-card group">
-                                            <div className="flex items-start justify-between mb-6">
-                                                <div className="p-3.5 bg-brand/10 border border-brand/20 rounded-2xl text-brand group-hover:bg-brand group-hover:text-white transition-all duration-300">
-                                                    <HiOutlineDocumentText className="text-2xl" />
+                                    documents
+                                        .filter(d => (docFilter === 'ALL' || d.type === docFilter) && d.name.toLowerCase().includes(docSearch.toLowerCase()))
+                                        .map(docObj => {
+                                            const expiry = docObj.expiryDate ? parseISO(docObj.expiryDate) : null;
+                                            const isExpiring = expiry && isBefore(expiry, addDays(new Date(), 30));
+                                            const isExpired = expiry && isBefore(expiry, new Date());
+
+                                            return (
+                                                <div key={docObj.id} className="stats-card group relative overflow-hidden">
+                                                    {isExpired && <div className="absolute top-0 left-0 w-full h-1 bg-danger shadow-[0_4px_12px_rgba(239,68,68,0.5)]"></div>}
+                                                    {isExpiring && !isExpired && <div className="absolute top-0 left-0 w-full h-1 bg-amber-500 shadow-[0_4px_12px_rgba(245,158,11,0.5)]"></div>}
+
+                                                    <div className="flex items-start justify-between mb-6">
+                                                        <div className={`p-3.5 border rounded-2xl transition-all duration-300 ${isExpired ? 'bg-danger/10 border-danger/20 text-danger' : isExpiring ? 'bg-amber-500/10 border-amber-500/20 text-amber-500' : 'bg-brand/10 border-brand/20 text-brand group-hover:bg-brand group-hover:text-white'}`}>
+                                                            <HiOutlineDocumentText className="text-2xl" />
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <a href={docObj.url} target="_blank" rel="noopener noreferrer" className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-500 hover:text-white transition-all"><HiOutlineDownload className="text-lg" /></a>
+                                                            <button onClick={() => handleDeleteDocument(docObj)} className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-500 hover:text-danger hover:border-danger/30 transition-all"><HiOutlineTrash className="text-lg" /></button>
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-4">
+                                                        <div className="flex flex-wrap gap-2">
+                                                            <span className="text-[8px] font-black text-brand bg-brand/5 px-2.5 py-1 rounded-lg border border-brand/10 uppercase tracking-widest leading-none flex items-center">{docObj.type}</span>
+                                                            <span className="text-[8px] font-black text-slate-500 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800 uppercase tracking-widest leading-none flex items-center">
+                                                                <HiOutlineOfficeBuilding className="mr-1 text-[10px]" /> {docObj.propertyName || "General"}
+                                                            </span>
+                                                        </div>
+                                                        <div>
+                                                            <h3 className="text-xl font-black text-white truncate h-7">{docObj.name}</h3>
+                                                            {docObj.expiryDate ? (
+                                                                <p className={`text-[9px] font-black uppercase tracking-widest mt-2 flex items-center gap-1.5 ${isExpired ? 'text-danger' : isExpiring ? 'text-amber-500' : 'text-slate-500'}`}>
+                                                                    <HiOutlineCalendar className="text-[11px]" />
+                                                                    {isExpired ? 'Expired' : 'Expiring'}: {format(parseISO(docObj.expiryDate), "MMM dd, yyyy")}
+                                                                </p>
+                                                            ) : (
+                                                                <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest mt-2">No Expiry Tracking</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div className="flex gap-2">
-                                                    <a href={docObj.url} target="_blank" rel="noopener noreferrer" className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-500 hover:text-white transition-all"><HiOutlineDownload className="text-lg" /></a>
-                                                    <button onClick={() => handleDeleteDocument(docObj)} className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-500 hover:text-danger hover:border-danger/30 transition-all"><HiOutlineTrash className="text-lg" /></button>
-                                                </div>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <span className="text-[8px] font-black text-brand bg-brand/5 px-2 py-0.5 rounded border border-brand/10 uppercase tracking-widest">{docObj.type}</span>
-                                                <h3 className="text-xl font-black text-white truncate">{docObj.name}</h3>
-                                                <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Uploaded: {docObj.uploadedAt?.toDate ? format(docObj.uploadedAt.toDate(), "MMM dd, yyyy") : "—"}</p>
-                                            </div>
-                                        </div>
-                                    ))
+                                            );
+                                        })
                                 )}
                             </div>
                         </motion.div>
                     )}
                 </AnimatePresence>
+
+                <PropertyHistoryModal
+                    isOpen={isHistoryOpen}
+                    onClose={() => setIsHistoryOpen(false)}
+                    property={selectedPropertyForHistory}
+                    currentUser={currentUser}
+                />
+
+                <DocumentUploadModal
+                    isOpen={isDocModalOpen}
+                    onClose={() => setIsDocModalOpen(false)}
+                    properties={properties}
+                    currentUser={currentUser}
+                />
             </div>
         </Layout>
     );
