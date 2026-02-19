@@ -12,6 +12,7 @@ export default function PropertyComparisonTable({ transactions, properties }) {
             const totals = {
                 id: property.id,
                 name: property.name,
+                status: property.status,
                 rent: 0,
                 bills: 0,
                 bonds: 0,
@@ -85,8 +86,8 @@ export default function PropertyComparisonTable({ transactions, properties }) {
                             <tr
                                 key={idx}
                                 className={`group transition-colors ${row.isTotal
-                                        ? "bg-slate-950 border-t-2 border-slate-800"
-                                        : "hover:bg-slate-800/30 border-b border-slate-800/50"
+                                    ? "bg-slate-950 border-t-2 border-slate-800"
+                                    : "hover:bg-slate-800/30 border-b border-slate-800/50"
                                     }`}
                             >
                                 <td className="px-8 py-5">
@@ -96,6 +97,9 @@ export default function PropertyComparisonTable({ transactions, properties }) {
                                         </div>
                                         <span className={`text-xs font-black uppercase tracking-widest ${row.isTotal ? "text-white" : "text-slate-300"}`}>
                                             {row.name}
+                                            {!row.isTotal && row.status === 'ARCHIVED' && (
+                                                <span className="ml-2 text-[8px] font-black text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 tracking-normal">PAST</span>
+                                            )}
                                         </span>
                                     </div>
                                 </td>

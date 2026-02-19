@@ -41,11 +41,13 @@ import {
     HiOutlineChevronRight,
     HiOutlineArrowLeft,
     HiOutlineShieldCheck,
-    HiOutlineUserGroup
+    HiOutlineUserGroup,
+    HiOutlineArchive
 } from "react-icons/hi";
 import PropertyHistoryModal from "./PropertyHistoryModal";
 import DocumentUploadModal from "./DocumentUploadModal";
 import DocumentPreviewModal from "./DocumentPreviewModal";
+import PropertyArchiveModal from "./PropertyArchiveModal";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, parseISO, isValid, isBefore, addDays } from "date-fns";
 import DataMigration from "./DataMigration";
@@ -87,6 +89,9 @@ export default function Settings() {
         tenantNames: [],
         rentHistory: []
     });
+
+    const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
+    const [selectedPropertyForArchive, setSelectedPropertyForArchive] = useState(null);
 
     useEffect(() => {
         if (!currentUser) return;
@@ -275,6 +280,23 @@ export default function Settings() {
             alert("Failed to save property.");
         } finally {
             setLoading(false);
+        }
+    }
+
+    async function toggleArchive(property) {
+        if (property.status === 'ARCHIVED') {
+            if (!window.confirm("Restore this property to active status?")) return;
+            try {
+                await updateDoc(doc(db, "users", currentUser.uid, "properties", property.id), {
+                    status: 'ACTIVE',
+                    updatedAt: new Date().toISOString()
+                });
+            } catch (err) {
+                console.error("Restore failed:", err);
+            }
+        } else {
+            setSelectedPropertyForArchive(property);
+            setIsArchiveModalOpen(true);
         }
     }
 
@@ -484,12 +506,15 @@ export default function Settings() {
                                                 >
                                                     <HiOutlineSearchCircle className="text-lg" />
                                                 </button>
+                                                <button onClick={() => toggleArchive(p)} className={`p-3 bg-slate-950 border border-slate-800 rounded-xl transition-all shadow-sm ${p.status === 'ARCHIVED' ? 'text-emerald-500 hover:text-white hover:bg-emerald-500' : 'text-amber-500 hover:text-white hover:bg-amber-500'}`} title={p.status === 'ARCHIVED' ? 'Unarchive Asset' : 'Archive Asset'}>
+                                                    <HiOutlineArchive className="text-lg" />
+                                                </button>
                                                 <button onClick={() => handleEdit(p)} className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-500 hover:text-white hover:border-brand/50 transition-all shadow-sm"><HiOutlinePencilAlt /></button>
                                                 <button onClick={() => handleDelete(p.id)} className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-500 hover:text-danger hover:border-danger/30 transition-all shadow-sm"><HiOutlineTrash /></button>
                                             </div>
                                         </div>
                                         <div className="space-y-4">
-                                            <h3 className="text-2xl font-black text-slate-100 tracking-tighter leading-tight">{p.name}</h3>
+                                            <h3 className={`text-2xl font-black tracking-tighter leading-tight ${p.status === 'ARCHIVED' ? 'text-slate-500 line-through decoration-slate-700' : 'text-slate-100'}`}>{p.name}</h3>
                                             <div className="flex flex-wrap gap-2">
                                                 {(p.tenantNames || []).map((name, i) => (
                                                     <span key={i} className="text-[9px] font-black bg-slate-900 text-slate-400 px-3 py-1.5 rounded-lg border border-slate-800 uppercase tracking-tighter">{name}</span>
@@ -503,7 +528,14 @@ export default function Settings() {
                                             </div>
                                             <div className="text-right">
                                                 <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1.5">Asset Status</p>
-                                                <span className="text-[10px] font-black text-success bg-success/10 px-3 py-1.5 rounded-full border border-success/20 tracking-tighter shadow-sm">ACTIVE UNIT</span>
+                                                {p.status === 'ARCHIVED' ? (
+                                                    <div className="text-right">
+                                                        <span className="text-[10px] font-black text-amber-500 bg-amber-500/10 px-3 py-1.5 rounded-full border border-amber-500/20 tracking-tighter shadow-sm">PAST / ARCHIVED</span>
+                                                        {p.moveOutDate && <p className="text-[9px] text-slate-500 font-bold mt-1 uppercase">Exited: {format(parseISO(p.moveOutDate), "MMM dd, yyyy")}</p>}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-[10px] font-black text-success bg-success/10 px-3 py-1.5 rounded-full border border-success/20 tracking-tighter shadow-sm">ACTIVE UNIT</span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -757,94 +789,97 @@ export default function Settings() {
                                 </div>
                             )}
                         </motion.div>
-                    )}
+                    )
+                    }
 
-                    {activeTab === "team" && userProfile?.role === "admin" && (
-                        <motion.div
-                            key="team-tab"
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className="space-y-8"
-                        >
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-800/50">
-                                <div>
-                                    <h3 className="text-3xl font-black text-white uppercase tracking-tighter">Team Management</h3>
-                                    <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px] mt-1 flex items-center gap-2">
-                                        <HiOutlineShieldCheck className="text-brand text-xs" /> Only authorized personnel can access this environment
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                                {/* Invite Form */}
-                                <div className="lg:col-span-1 space-y-6">
-                                    <div className="stats-card bg-slate-950/40 border-brand/20">
-                                        <h4 className="text-white font-black uppercase tracking-tight mb-6 flex items-center gap-2">
-                                            <HiOutlinePlus className="text-brand" /> Provision Access
-                                        </h4>
-                                        <div className="space-y-4">
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Email Identifier</label>
-                                                <input
-                                                    className="input-field"
-                                                    placeholder="user@domain.com"
-                                                    value={inviteEmail}
-                                                    onChange={(e) => setInviteEmail(e.target.value)}
-                                                />
-                                            </div>
-                                            <button
-                                                onClick={handleInvite}
-                                                className="btn-primary w-full py-4 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-brand/20"
-                                            >
-                                                Add to Guest List
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800">
-                                        <p className="text-xs text-slate-500 leading-relaxed font-medium">
-                                            People on the guest list can register a new account. Once they sign up, they will appear in your team directory.
+                    {
+                        activeTab === "team" && userProfile?.role === "admin" && (
+                            <motion.div
+                                key="team-tab"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                className="space-y-8"
+                            >
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-800/50">
+                                    <div>
+                                        <h3 className="text-3xl font-black text-white uppercase tracking-tighter">Team Management</h3>
+                                        <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px] mt-1 flex items-center gap-2">
+                                            <HiOutlineShieldCheck className="text-brand text-xs" /> Only authorized personnel can access this environment
                                         </p>
                                     </div>
                                 </div>
 
-                                {/* Guest List */}
-                                <div className="lg:col-span-2 space-y-4">
-                                    <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest px-2">Authorized Accounts</h4>
-                                    <div className="space-y-2">
-                                        {invitations.length === 0 ? (
-                                            <div className="py-20 text-center bg-slate-950/20 border-2 border-dashed border-slate-800 rounded-[2.5rem]">
-                                                <p className="text-slate-600 font-black uppercase tracking-widest text-[10px]">No active invitations</p>
-                                            </div>
-                                        ) : (
-                                            invitations.map(invite => (
-                                                <div key={invite.email} className="flex items-center justify-between p-5 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-3xl transition-all group">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="p-3 bg-slate-950 rounded-2xl text-slate-500 group-hover:text-brand transition-colors">
-                                                            <HiOutlineUser />
-                                                        </div>
-                                                        <div>
-                                                            <h5 className="text-sm font-black text-white">{invite.email}</h5>
-                                                            <p className="text-[9px] text-slate-600 font-bold uppercase tracking-widest">Authorized Guest • {invite.role}</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-4">
-                                                        <span className="text-[10px] font-bold text-slate-600">Invited By {invite.invitedBy === 'system' ? 'System' : invite.invitedBy.split('@')[0]}</span>
-                                                        <button
-                                                            onClick={() => handleRemoveInvite(invite.email)}
-                                                            className="p-2 text-slate-600 hover:text-danger hover:bg-danger/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                                                        >
-                                                            <HiOutlineTrash />
-                                                        </button>
-                                                    </div>
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                    {/* Invite Form */}
+                                    <div className="lg:col-span-1 space-y-6">
+                                        <div className="stats-card bg-slate-950/40 border-brand/20">
+                                            <h4 className="text-white font-black uppercase tracking-tight mb-6 flex items-center gap-2">
+                                                <HiOutlinePlus className="text-brand" /> Provision Access
+                                            </h4>
+                                            <div className="space-y-4">
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Email Identifier</label>
+                                                    <input
+                                                        className="input-field"
+                                                        placeholder="user@domain.com"
+                                                        value={inviteEmail}
+                                                        onChange={(e) => setInviteEmail(e.target.value)}
+                                                    />
                                                 </div>
-                                            ))
-                                        )}
+                                                <button
+                                                    onClick={handleInvite}
+                                                    className="btn-primary w-full py-4 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-brand/20"
+                                                >
+                                                    Add to Guest List
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800">
+                                            <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                                                People on the guest list can register a new account. Once they sign up, they will appear in your team directory.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Guest List */}
+                                    <div className="lg:col-span-2 space-y-4">
+                                        <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest px-2">Authorized Accounts</h4>
+                                        <div className="space-y-2">
+                                            {invitations.length === 0 ? (
+                                                <div className="py-20 text-center bg-slate-950/20 border-2 border-dashed border-slate-800 rounded-[2.5rem]">
+                                                    <p className="text-slate-600 font-black uppercase tracking-widest text-[10px]">No active invitations</p>
+                                                </div>
+                                            ) : (
+                                                invitations.map(invite => (
+                                                    <div key={invite.email} className="flex items-center justify-between p-5 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-3xl transition-all group">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="p-3 bg-slate-950 rounded-2xl text-slate-500 group-hover:text-brand transition-colors">
+                                                                <HiOutlineUser />
+                                                            </div>
+                                                            <div>
+                                                                <h5 className="text-sm font-black text-white">{invite.email}</h5>
+                                                                <p className="text-[9px] text-slate-600 font-bold uppercase tracking-widest">Authorized Guest • {invite.role}</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-4">
+                                                            <span className="text-[10px] font-bold text-slate-600">Invited By {invite.invitedBy === 'system' ? 'System' : invite.invitedBy.split('@')[0]}</span>
+                                                            <button
+                                                                onClick={() => handleRemoveInvite(invite.email)}
+                                                                className="p-2 text-slate-600 hover:text-danger hover:bg-danger/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                                            >
+                                                                <HiOutlineTrash />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </motion.div>
-                    )}
+                            </motion.div>
+                        )
+                    }
                 </AnimatePresence>
 
                 <PropertyHistoryModal
@@ -866,6 +901,17 @@ export default function Settings() {
                     onClose={() => setSelectedPreviewDoc(null)}
                     document={selectedPreviewDoc}
                     onDelete={handleDeleteDocument}
+                />
+
+                <PropertyArchiveModal
+                    isOpen={isArchiveModalOpen}
+                    onClose={() => setIsArchiveModalOpen(false)}
+                    property={selectedPropertyForArchive}
+                    properties={properties}
+                    currentUser={currentUser}
+                    onComplete={() => {
+                        console.log("Archive complete");
+                    }}
                 />
             </div>
         </Layout>

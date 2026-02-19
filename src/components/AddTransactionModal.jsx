@@ -62,7 +62,9 @@ export default function AddTransactionModal({ isOpen, onClose }) {
         if (isOpen && currentUser) {
             const q = query(collection(db, "users", currentUser.uid, "properties"));
             const unsubscribe = onSnapshot(q, (snapshot) => {
-                const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const data = snapshot.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() }))
+                    .filter(p => p.status !== 'ARCHIVED');
                 setProperties(data);
             }, (error) => {
                 console.error("Error fetching properties:", error);

@@ -187,11 +187,15 @@ export default function Dashboard() {
     };
 
     const getNextRentDue = () => {
-        const rentTx = transactions.filter(t => t.type === "RENT").sort((a, b) => {
-            const dateA = a.endDate?.toDate ? a.endDate.toDate() : (a.endDate ? parseISO(a.endDate) : new Date(0));
-            const dateB = b.endDate?.toDate ? b.endDate.toDate() : (b.endDate ? parseISO(b.endDate) : new Date(0));
-            return dateB - dateA;
-        })[0];
+        const activePropIds = properties.filter(p => p.status !== 'ARCHIVED').map(p => p.id);
+
+        const rentTx = transactions
+            .filter(t => t.type === "RENT" && activePropIds.includes(t.propertyId))
+            .sort((a, b) => {
+                const dateA = a.endDate?.toDate ? a.endDate.toDate() : (a.endDate ? parseISO(a.endDate) : new Date(0));
+                const dateB = b.endDate?.toDate ? b.endDate.toDate() : (b.endDate ? parseISO(b.endDate) : new Date(0));
+                return dateB - dateA;
+            })[0];
 
         if (!rentTx) return null;
 
