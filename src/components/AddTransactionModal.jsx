@@ -14,7 +14,8 @@ import {
     where,
     orderBy,
     limit,
-    Timestamp
+    Timestamp,
+    onSnapshot
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
@@ -556,6 +557,7 @@ export default function AddTransactionModal({ isOpen, onClose }) {
                                                                     <option value="WIFI">🌐 Wifi / Internet</option>
                                                                     <option value="WATER">💧 Water</option>
                                                                     <option value="COUNCIL">🏢 Council Rates</option>
+                                                                    <option value="BOND">🏦 Bond / Deposit</option>
                                                                     <option value="OTHER">📦 Other Utility</option>
                                                                 </select>
                                                             </div>

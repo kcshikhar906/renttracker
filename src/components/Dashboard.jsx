@@ -32,6 +32,7 @@ import {
 import DeleteConfirmationModal from "./DeleteConfirmationModal";
 import { format, parseISO, isAfter, subDays, addDays, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 import DataMigration from "./DataMigration";
+import PropertyComparisonTable from "./PropertyComparisonTable";
 
 const StatCard = ({ title, amount, icon: Icon, colorClass, children }) => (
     <div className="stats-card">
@@ -299,8 +300,13 @@ export default function Dashboard() {
                     </div>
                 </div>
 
+                {/* Visual Analytics */}
+                <ExpenseCharts transactions={transactions} />
+
+                <PropertyComparisonTable transactions={transactions} properties={properties} />
+
                 {/* High Visibility Quick Insights */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {nextDueInfo ? (
                         <motion.div
                             initial={{ opacity: 0, x: -20 }}
@@ -358,6 +364,23 @@ export default function Dashboard() {
                         </div>
                         <div className="text-right">
                             <span className="text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/20 uppercase tracking-widest leading-none">Healthy</span>
+                        </div>
+                    </motion.div>
+
+                    <motion.div
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="bg-indigo-500/5 border border-indigo-500/10 p-6 rounded-[2.5rem] flex items-center justify-between"
+                    >
+                        <div className="flex items-center gap-6">
+                            <div className="p-4 bg-indigo-500 text-white rounded-3xl shadow-xl shadow-indigo-500/20">
+                                <HiOutlineHome className="text-2xl" />
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em]">Portfolio Size</p>
+                                <h4 className="text-2xl font-black text-white">{properties.length} Assets</h4>
+                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Active Managed Units</p>
+                            </div>
                         </div>
                     </motion.div>
                 </div>

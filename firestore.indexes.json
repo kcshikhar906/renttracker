@@ -5,9 +5,19 @@
             "queryScope": "COLLECTION",
             "fields": [
                 {
-                    "fieldPath": "uid",
+                    "fieldPath": "propertyId",
                     "order": "ASCENDING"
                 },
+                {
+                    "fieldPath": "periodEnd",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "transactions",
+            "queryScope": "COLLECTION",
+            "fields": [
                 {
                     "fieldPath": "propertyId",
                     "order": "ASCENDING"
