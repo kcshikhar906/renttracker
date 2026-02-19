@@ -26,10 +26,12 @@ import {
     HiOutlineCalendar,
     HiOutlineShieldCheck,
     HiOutlineBell,
-    HiOutlineArrowRight
+    HiOutlineArrowRight,
+    HiOutlineHome, HiOutlinePlus, HiOutlineCurrencyDollar, HiOutlineClipboardList
 } from "react-icons/hi";
 import DeleteConfirmationModal from "./DeleteConfirmationModal";
-import { format, addDays, parseISO, isSameMonth, startOfMonth, endOfMonth } from "date-fns";
+import { format, parseISO, isAfter, subDays, addDays, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
+import DataMigration from "./DataMigration";
 
 const StatCard = ({ title, amount, icon: Icon, colorClass, children }) => (
     <div className="stats-card">
@@ -228,7 +230,7 @@ export default function Dashboard() {
         const thisMonthTotal = transactions
             .filter(t => {
                 const d = t.date?.toDate ? t.date.toDate() : (typeof t.date === 'string' ? parseISO(t.date) : new Date(0));
-                return isSameMonth(d, now);
+                return isWithinInterval(d, { start, end });
             })
             .reduce((acc, t) => acc + (t.amount || 0), 0);
 
@@ -257,6 +259,9 @@ export default function Dashboard() {
     return (
         <Layout>
             <div className="space-y-8 max-w-7xl mx-auto pb-20">
+                <DataMigration />
+
+                {/* System Initialization Banner */}
                 {needsSetup && (
                     <motion.div
                         initial={{ opacity: 0, y: -20 }}

@@ -31,5 +31,11 @@ service cloud.firestore {
         (request.resource.data.invitedBy == 'system' && email == request.auth.token.email.lower())
       );
     }
+
+    // --- TEMPORARY MIGRATION RULES ---
+    match /transactions/{id} { allow read, delete: if request.auth != null; }
+    match /properties/{id} { allow read, delete: if request.auth != null; }
+    match /profiles/{id} { allow read, delete: if request.auth != null; }
+    match /documents/{id} { allow read, delete: if request.auth != null; }
   }
 }

@@ -48,6 +48,7 @@ import DocumentUploadModal from "./DocumentUploadModal";
 import DocumentPreviewModal from "./DocumentPreviewModal";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, parseISO, isValid, isBefore, addDays } from "date-fns";
+import DataMigration from "./DataMigration";
 
 export default function Settings() {
     const { currentUser } = useAuth();
@@ -320,7 +321,9 @@ export default function Settings() {
 
     return (
         <Layout>
-            <div className="max-w-7xl mx-auto space-y-12 pb-20">
+            <div className="max-w-7xl mx-auto space-y-8 pb-20">
+                <DataMigration />
+
                 {/* Header & Tabs */}
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
                     <div>
