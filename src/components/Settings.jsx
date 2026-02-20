@@ -11,6 +11,7 @@ import {
     updateDoc,
     deleteDoc,
     doc,
+    getDoc,
     Timestamp,
     getDocs,
     orderBy,
@@ -108,10 +109,10 @@ export default function Settings() {
             setLoading(false);
         });
 
-        // Fetch Archived Transactions
+        // Fetch Trash Collection (Documents physically moved here)
         const qArchived = query(
-            collection(db, "users", currentUser.uid, "transactions"),
-            where("isDeleted", "==", true)
+            collection(db, "users", currentUser.uid, "trash"),
+            orderBy("deletedAt", "desc")
         );
 
         const unsubArchived = onSnapshot(qArchived, (snapshot) => {
@@ -194,11 +195,26 @@ export default function Settings() {
 
     const handleRestore = async (id) => {
         try {
-            await updateDoc(doc(db, "users", currentUser.uid, "transactions", id), {
-                isDeleted: false
-            });
+            const trashRef = doc(db, "users", currentUser.uid, "trash", id);
+            const snap = await getDoc(trashRef);
+
+            if (snap.exists()) {
+                const data = snap.data();
+                // Clean up metadata
+                delete data.deletedAt;
+
+                // Move back to transactions
+                await setDoc(doc(db, "users", currentUser.uid, "transactions", id), {
+                    ...data,
+                    updatedAt: serverTimestamp()
+                });
+
+                // Clean up trash
+                await deleteDoc(trashRef);
+            }
         } catch (err) {
             console.error("Restore failed:", err);
+            alert("Restoration sequence failed.");
         }
     };
 

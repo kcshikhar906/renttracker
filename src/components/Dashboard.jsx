@@ -14,6 +14,7 @@ import {
     doc,
     setDoc,
     getDoc,
+    deleteDoc,
     getDocs,
     limit,
     serverTimestamp
@@ -87,13 +88,10 @@ export default function Dashboard() {
         );
 
         const unsubscribeData = onSnapshot(q, (snapshot) => {
-            const allDocs = snapshot.docs.map(doc => ({
+            const data = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
             }));
-
-            // Filter out soft-deleted items on the client side
-            const data = allDocs.filter(t => t.isDeleted !== true);
 
             const rentTotal = data
                 .filter(t => t.type === "RENT")
@@ -175,14 +173,22 @@ export default function Dashboard() {
     const confirmDelete = async () => {
         if (!transactionToDelete) return;
         try {
-            await updateDoc(doc(db, "users", user.uid, "transactions", transactionToDelete.id), {
-                isDeleted: true
-            });
+            const docRef = doc(db, "users", user.uid, "transactions", transactionToDelete.id);
+            const snap = await getDoc(docRef);
+
+            if (snap.exists()) {
+                await setDoc(doc(db, "users", user.uid, "trash", transactionToDelete.id), {
+                    ...snap.data(),
+                    deletedAt: serverTimestamp()
+                });
+                await deleteDoc(docRef);
+            }
+
             setIsDeleteModalOpen(false);
             setTransactionToDelete(null);
         } catch (err) {
-            console.error("Soft delete failed:", err);
-            alert("Failed to move records to trash.");
+            console.error("Move to trash failed:", err);
+            alert("Failed to move record to trash vault.");
         }
     };
 

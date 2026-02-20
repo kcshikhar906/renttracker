@@ -87,6 +87,7 @@ export default function AddTransactionModal({ isOpen, onClose }) {
                     const q = query(
                         collection(db, "users", currentUser.uid, "transactions"),
                         where("propertyId", "==", selectedPropertyId),
+                        where("type", "==", "RENT"),
                         orderBy("periodEnd", "desc"),
                         limit(1)
                     );

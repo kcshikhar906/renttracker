@@ -8,7 +8,7 @@ import ExportMenu from "./ExportMenu";
 import ImportModal from "./ImportModal";
 import { db, auth } from "../firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, query, where, orderBy, onSnapshot, updateDoc, doc, getDocs } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, updateDoc, doc, getDocs, getDoc, deleteDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { format, isWithinInterval, startOfDay, endOfDay, parseISO, isValid } from "date-fns";
 import { HiOutlineSearch, HiOutlineFilter, HiOutlineCollection, HiOutlineX, HiOutlineDocumentDownload, HiOutlineDownload } from "react-icons/hi";
 import jsPDF from "jspdf";
@@ -85,8 +85,7 @@ export default function Transactions() {
 
         const unsubscribeData = onSnapshot(q, (snapshot) => {
             const allDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            // Filter out soft-deleted items on the client side
-            setTransactions(allDocs.filter(t => t.isDeleted !== true));
+            setTransactions(allDocs);
             setLoading(false);
         }, (err) => {
             console.error("Firestore error:", err);
@@ -171,14 +170,22 @@ export default function Transactions() {
     const confirmDelete = async () => {
         if (!transactionToDelete) return;
         try {
-            await updateDoc(doc(db, "users", user.uid, "transactions", transactionToDelete.id), {
-                isDeleted: true
-            });
+            const docRef = doc(db, "users", user.uid, "transactions", transactionToDelete.id);
+            const snap = await getDoc(docRef);
+
+            if (snap.exists()) {
+                await setDoc(doc(db, "users", user.uid, "trash", transactionToDelete.id), {
+                    ...snap.data(),
+                    deletedAt: serverTimestamp()
+                });
+                await deleteDoc(docRef);
+            }
+
             setIsDeleteModalOpen(false);
             setTransactionToDelete(null);
         } catch (err) {
-            console.error("Soft delete failed:", err);
-            alert("Failed to move transaction to trash.");
+            console.error("Move to trash failed:", err);
+            alert("Failed to vault that record in trash.");
         }
     };
 
