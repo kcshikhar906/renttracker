@@ -129,18 +129,16 @@ export default function EditTransactionModal({ isOpen, onClose, transaction }) {
                 notes,
                 tenant,
                 date: Timestamp.fromDate(isValid(settlementDate) ? settlementDate : new Date()),
-                fileUrl: fileUrl,
-                updatedAt: Timestamp.now()
+                fileUrl: fileUrl || null,
+                updatedAt: Timestamp.now(),
+                periodStart: type === "RENT" ? periodStart : null,
+                periodEnd: type === "RENT" ? periodEnd : null,
+                duration: type === "RENT" ? duration : null,
+                startDate: type === "RENT" && isValid(startD) ? Timestamp.fromDate(startD) : null,
+                endDate: type === "RENT" && isValid(endD) ? Timestamp.fromDate(endD) : null,
             };
 
-            if (type === "RENT") {
-                updatedData.periodStart = periodStart;
-                updatedData.periodEnd = periodEnd;
-                updatedData.startDate = isValid(startD) ? Timestamp.fromDate(startD) : null;
-                updatedData.endDate = isValid(endD) ? Timestamp.fromDate(endD) : null;
-                // Note: Keep existing amount unless we want to recalculate? 
-                // Usually editing a rent transaction shouldn't trigger total change unless intentional.
-            } else {
+            if (type === "BILL") {
                 updatedData.amount = parseFloat(billAmount || 0);
                 updatedData.utilityType = utilityType;
             }
@@ -224,6 +222,43 @@ export default function EditTransactionModal({ isOpen, onClose, transaction }) {
                                                 </select>
                                             </div>
                                         </div>
+
+                                        {type === "RENT" && (
+                                            <div className="space-y-6">
+                                                <div className="grid grid-cols-2 gap-6">
+                                                    <div className="space-y-2">
+                                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Start Date</label>
+                                                        <input
+                                                            type="date"
+                                                            className="input-field font-bold border-brand"
+                                                            value={periodStart}
+                                                            onChange={(e) => setPeriodStart(e.target.value)}
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Cycle Duration</label>
+                                                        <select className="input-field font-bold" value={duration} onChange={(e) => setDuration(e.target.value)}>
+                                                            <option value="1">1 Week</option>
+                                                            <option value="2">2 Weeks</option>
+                                                            <option value="3">3 Weeks</option>
+                                                            <option value="4">4 Weeks</option>
+                                                            <option value="5">5 Weeks</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+
+                                                <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 flex items-center justify-between">
+                                                    <div>
+                                                        <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-1">Calculated Period</p>
+                                                        <p className="text-sm font-bold text-white">{periodStart || "???"} — {periodEnd || "???"}</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-[10px] font-black text-brand uppercase tracking-widest mb-1">Duration</p>
+                                                        <p className="text-sm font-black text-white">{duration} Week(s)</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {type === "BILL" && (
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -165,6 +165,10 @@ export default function Transactions() {
 
     const totalPages = Math.ceil(filteredTransactions.length / entriesPerPage);
 
+    const filteredTotal = useMemo(() => {
+        return filteredTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+    }, [filteredTransactions]);
+
     const clearFilters = () => {
         setFilterType("ALL");
         setFilterProperty("ALL");
@@ -479,9 +483,15 @@ export default function Transactions() {
                             )}
                         </div>
 
-                        <div className="flex items-center gap-4">
-                            <span className="text-[10px] font-black text-brand uppercase tracking-tighter bg-brand/10 border border-brand/20 px-4 py-1.5 rounded-full">
-                                {filteredTransactions.length} Matches Found
+                        <div className="flex items-center gap-3">
+                            <div className="flex flex-col items-end mr-2">
+                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5 opacity-60">Cumulative Total</span>
+                                <span className="text-sm font-black text-white hover:text-brand transition-colors">
+                                    ${filteredTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                            <span className="text-[10px] font-black text-brand uppercase tracking-tighter bg-brand/10 border border-brand/20 px-4 py-2 rounded-2xl shadow-lg shadow-brand/5">
+                                {filteredTransactions.length} Records
                             </span>
                         </div>
                     </div>

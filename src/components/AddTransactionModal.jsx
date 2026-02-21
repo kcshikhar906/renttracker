@@ -302,6 +302,7 @@ export default function AddTransactionModal({ isOpen, onClose }) {
                 tenant,
                 periodStart: type === "RENT" ? periodStart : null,
                 periodEnd: type === "RENT" ? periodEnd : null,
+                duration: type === "RENT" ? duration : null,
                 startDate: type === "RENT" && isValid(startD) ? Timestamp.fromDate(startD) : null,
                 endDate: type === "RENT" && isValid(endD) ? Timestamp.fromDate(endD) : null,
                 fileUrl: fileUrl || null,
