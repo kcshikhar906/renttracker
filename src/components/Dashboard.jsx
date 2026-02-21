@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import Layout from "./Layout";
 import TransactionList from "./TransactionList";
 import ExpenseCharts from "./ExpenseCharts";
@@ -21,15 +22,15 @@ import {
 } from "firebase/firestore";
 import { motion } from "framer-motion";
 import {
-    HiOutlineTrendingUp,
+    HiOutlineArrowTrendingUp,
     HiOutlineCreditCard,
-    HiOutlineLightningBolt,
+    HiOutlineBolt,
     HiOutlineCalendar,
     HiOutlineShieldCheck,
     HiOutlineBell,
     HiOutlineArrowRight,
-    HiOutlineHome, HiOutlinePlus, HiOutlineCurrencyDollar, HiOutlineClipboardList
-} from "react-icons/hi";
+    HiOutlineHome, HiOutlinePlus, HiOutlineCurrencyDollar, HiOutlineClipboardDocumentList
+} from "react-icons/hi2";
 import DeleteConfirmationModal from "./DeleteConfirmationModal";
 import { format, parseISO, isAfter, subDays, addDays, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 import DataMigration from "./DataMigration";
@@ -54,6 +55,7 @@ const StatCard = ({ title, amount, icon: Icon, colorClass, children }) => (
 );
 
 export default function Dashboard() {
+    const navigate = useNavigate();
     const [transactions, setTransactions] = useState([]);
     const [properties, setProperties] = useState([]);
     const [totals, setTotals] = useState({ rent: 0, bills: 0 });
@@ -301,132 +303,143 @@ export default function Dashboard() {
                 {/* Welcome Section */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <h2 className="text-3xl font-bold text-slate-100 tracking-tight">Overview</h2>
-                        <p className="text-slate-500 mt-1">Snapshot of your spending and rental obligations.</p>
+                        <h2 className="text-4xl font-black text-white tracking-tighter">Executive Overview</h2>
+                        <p className="text-slate-500 font-medium text-sm">Strategic insight into your property portfolio & liabilities.</p>
                     </div>
-                    <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase bg-slate-900 border border-slate-800 px-4 py-2 rounded-xl">
-                        <span className="w-2 h-2 rounded-full bg-success animate-pulse"></span>
-                        Real-time Monitoring
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 text-[10px] font-black text-emerald-500 uppercase bg-emerald-500/10 border border-emerald-500/20 px-4 py-2.5 rounded-2xl">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            Live Ledger Sync
+                        </div>
                     </div>
                 </div>
 
-                {/* Visual Analytics */}
-                <ExpenseCharts transactions={transactions} />
-
-                <PropertyComparisonTable transactions={transactions} properties={properties} />
-
-                {/* High Visibility Quick Insights */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Primary Intelligence: Urgent Actions & Quick Metrics */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {nextDueInfo ? (
                         <motion.div
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            className="relative overflow-hidden bg-brand/10 border border-brand/20 p-6 rounded-[2.5rem] flex items-center justify-between group"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="relative overflow-hidden bg-brand/10 border border-brand/20 p-8 rounded-[2.5rem] group"
                         >
-                            <div className="relative z-10 flex items-center gap-6">
-                                <div className="p-4 bg-brand text-white rounded-3xl shadow-xl shadow-brand/30 group-hover:scale-110 transition-transform">
-                                    <HiOutlineBell className="text-2xl" />
+                            <div className="relative z-10 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="p-4 bg-brand text-white rounded-[1.25rem] shadow-xl shadow-brand/30">
+                                        <HiOutlineBell className="text-2xl" />
+                                    </div>
+                                    <button
+                                        onClick={addToCalendar}
+                                        className="p-3 bg-slate-950 border border-slate-800 text-slate-500 hover:text-white hover:border-brand/40 rounded-xl transition-all"
+                                    >
+                                        <HiOutlineCalendar className="text-xl" />
+                                    </button>
                                 </div>
-                                <div className="space-y-1">
-                                    <p className="text-[10px] font-black text-brand uppercase tracking-[0.2em]">Next Payment Due</p>
-                                    <h4 className="text-2xl font-black text-white">{format(nextDueInfo.date, "EEEE, MMM dd")}</h4>
-                                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest flex items-center gap-1.5">
-                                        <span className="w-1 h-1 rounded-full bg-slate-500"></span> {nextDueInfo.propertyName}
+                                <div>
+                                    <p className="text-[10px] font-black text-brand uppercase tracking-[0.25em]">Critical Payment Due</p>
+                                    <h4 className="text-3xl font-black text-white mt-1">{format(nextDueInfo.date, "EEEE, MMM dd")}</h4>
+                                    <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2 mt-2">
+                                        {nextDueInfo.propertyName}
                                     </p>
                                 </div>
                             </div>
-                            <button
-                                onClick={addToCalendar}
-                                className="relative z-10 p-4 bg-slate-950 border border-slate-800 text-slate-400 hover:text-white hover:border-brand/40 rounded-2xl transition-all"
-                                title="Add to Calendar"
-                            >
-                                <HiOutlineCalendar className="text-xl" />
-                            </button>
-                            {/* Decorative background flair */}
-                            <div className="absolute -right-4 -bottom-4 w-32 h-32 bg-brand/5 rounded-full blur-3xl group-hover:bg-brand/10 transition-colors"></div>
+                            <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-brand/5 rounded-full blur-3xl"></div>
                         </motion.div>
                     ) : (
-                        <div className="bg-slate-900/30 border border-slate-800/50 p-6 rounded-[2.5rem] flex items-center gap-6">
-                            <div className="p-4 bg-slate-800 text-slate-600 rounded-3xl">
+                        <div className="bg-slate-900/40 border border-slate-800/50 p-8 rounded-[2.5rem] flex flex-col justify-center gap-4">
+                            <div className="p-4 bg-slate-800/50 text-slate-500 rounded-[1.25rem] w-fit">
                                 <HiOutlineShieldCheck className="text-2xl" />
                             </div>
                             <div>
-                                <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em]">Compliance Status</p>
-                                <h4 className="text-xl font-black text-slate-400">All Obligations Met</h4>
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.25em]">Ledger Status</p>
+                                <h4 className="text-2xl font-black text-slate-400 mt-1">Status Nominal</h4>
                             </div>
                         </div>
                     )}
 
                     <motion.div
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="bg-emerald-500/5 border border-emerald-500/10 p-6 rounded-[2.5rem] flex items-center justify-between"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.1 }}
+                        className="bg-emerald-500/5 border border-emerald-500/10 p-8 rounded-[2.5rem] flex flex-col justify-between"
                     >
-                        <div className="flex items-center gap-6">
-                            <div className="p-4 bg-emerald-500 text-white rounded-3xl shadow-xl shadow-emerald-500/20">
-                                <HiOutlineTrendingUp className="text-2xl" />
-                            </div>
-                            <div className="space-y-1">
-                                <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em]">Monthly Velocity</p>
-                                <h4 className="text-2xl font-black text-white">${monthlyForecast.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h4>
-                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Total Expenses: {format(new Date(), "MMMM")}</p>
-                            </div>
+                        <div className="p-4 bg-emerald-500 text-white rounded-[1.25rem] w-fit shadow-xl shadow-emerald-500/20">
+                            <HiOutlineArrowTrendingUp className="text-2xl" />
                         </div>
-                        <div className="text-right">
-                            <span className="text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/20 uppercase tracking-widest leading-none">Healthy</span>
+                        <div className="mt-6">
+                            <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.25em]">Burn Rate (30D)</p>
+                            <h4 className="text-3xl font-black text-white mt-1">${monthlyForecast.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h4>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-2">{format(new Date(), "MMMM")} Projection</p>
                         </div>
                     </motion.div>
 
                     <motion.div
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="bg-indigo-500/5 border border-indigo-500/10 p-6 rounded-[2.5rem] flex items-center justify-between"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                        className="bg-indigo-500/5 border border-indigo-500/10 p-8 rounded-[2.5rem] flex flex-col justify-between"
                     >
-                        <div className="flex items-center gap-6">
-                            <div className="p-4 bg-indigo-500 text-white rounded-3xl shadow-xl shadow-indigo-500/20">
-                                <HiOutlineHome className="text-2xl" />
-                            </div>
-                            <div className="space-y-1">
-                                <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em]">Portfolio Size</p>
-                                <h4 className="text-2xl font-black text-white">{properties.length} Assets</h4>
-                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Active Managed Units</p>
-                            </div>
+                        <div className="p-4 bg-indigo-500 text-white rounded-[1.25rem] w-fit shadow-xl shadow-indigo-500/20">
+                            <HiOutlineHome className="text-2xl" />
+                        </div>
+                        <div className="mt-6">
+                            <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.25em]">Managed Assets</p>
+                            <h4 className="text-3xl font-black text-white mt-1">{properties.length} Units</h4>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-2">Active Portfolio Count</p>
                         </div>
                     </motion.div>
                 </div>
 
-                {/* Stats Grid */}
+                {/* Secondary Metrics: Historical Aggregate Stats */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     <StatCard
-                        title="Historical Rent"
+                        title="Lifetime Rent Contributions"
                         amount={totals.rent}
-                        icon={HiOutlineTrendingUp}
+                        icon={HiOutlineArrowTrendingUp}
                         colorClass="text-brand"
                     />
                     <StatCard
-                        title="Historical Bills"
+                        title="Lifetime Utility Liabilities"
                         amount={totals.bills}
                         icon={HiOutlineCreditCard}
                         colorClass="text-warning"
                     />
                     <StatCard
-                        title="Gross Expenditure"
+                        title="Total Portfolio Outflow"
                         amount={totals.rent + totals.bills}
-                        icon={HiOutlineLightningBolt}
+                        icon={HiOutlineBolt}
                         colorClass="text-success"
                     />
                 </div>
 
-                {/* Visual Analytics */}
-                <ExpenseCharts transactions={transactions} />
+                {/* Deep Analytics: Visuals & Asset Comparisons */}
+                <div className="space-y-6">
+                    <ExpenseCharts transactions={transactions} />
+                    <PropertyComparisonTable transactions={transactions} properties={properties} />
+                </div>
 
-                {/* Recent Transactions */}
-                <section>
-                    <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-lg font-bold text-slate-100">Transaction History</h3>
+                {/* Recent Activity: Limited Ledger View */}
+                <section className="bg-slate-900/30 border border-slate-800/50 rounded-[3rem] p-8 lg:p-12">
+                    <div className="flex items-center justify-between mb-10">
+                        <div className="flex items-center gap-4">
+                            <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl text-slate-500">
+                                <HiOutlineClipboardDocumentList className="text-2xl" />
+                            </div>
+                            <div className="mt-6">
+                                <h3 className="text-2xl font-black text-white tracking-tight uppercase">Recent Settlements</h3>
+                                <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] mt-1">Last 5 Verified Entries</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => navigate("/transactions")}
+                            className="flex items-center gap-3 px-6 py-4 bg-slate-950 border border-slate-800 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-brand hover:border-brand/40 transition-all group"
+                        >
+                            View Entire Ledger
+                            <HiOutlineArrowRight className="text-lg group-hover:translate-x-1 transition-transform" />
+                        </button>
                     </div>
+
                     <TransactionList
-                        transactions={transactions}
+                        transactions={transactions.slice(0, 5)}
                         loading={loading}
                         onDelete={handleDelete}
                     />

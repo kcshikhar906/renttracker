@@ -1,4 +1,4 @@
-import React, { useEffect, useState, Fragment } from "react";
+import React, { useEffect, useState, useMemo, Fragment } from "react";
 import { Transition, Dialog, TransitionChild, DialogPanel, DialogTitle } from "@headlessui/react";
 import Layout from "./Layout";
 import TransactionList from "./TransactionList";
@@ -10,7 +10,18 @@ import { db, auth } from "../firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, query, where, orderBy, onSnapshot, updateDoc, doc, getDocs, getDoc, deleteDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { format, isWithinInterval, startOfDay, endOfDay, parseISO, isValid } from "date-fns";
-import { HiOutlineSearch, HiOutlineFilter, HiOutlineCollection, HiOutlineX, HiOutlineDocumentDownload, HiOutlineDownload } from "react-icons/hi";
+import {
+    HiOutlineMagnifyingGlass,
+    HiOutlineFunnel,
+    HiOutlineRectangleStack,
+    HiOutlineXMark,
+    HiOutlineArrowDownTray,
+    HiOutlineChevronLeft,
+    HiOutlineChevronRight,
+    HiChevronUpDown,
+    HiOutlineCalendarDays,
+    HiOutlineArrowPath
+} from "react-icons/hi2";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import DeleteConfirmationModal from "./DeleteConfirmationModal";
@@ -54,6 +65,10 @@ export default function Transactions() {
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
+
+    // Pagination
+    const [currentPage, setCurrentPage] = useState(1);
+    const [entriesPerPage, setEntriesPerPage] = useState(10);
 
     useEffect(() => {
         const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
@@ -140,7 +155,15 @@ export default function Transactions() {
         }
 
         setFilteredTransactions(result);
+        setCurrentPage(1); // Reset to first page when search/filter changes
     }, [transactions, filterType, filterProperty, filterStatus, filterUtility, startDate, endDate, searchQuery]);
+
+    const paginatedTransactions = useMemo(() => {
+        const startIndex = (currentPage - 1) * entriesPerPage;
+        return filteredTransactions.slice(startIndex, startIndex + entriesPerPage);
+    }, [filteredTransactions, currentPage, entriesPerPage]);
+
+    const totalPages = Math.ceil(filteredTransactions.length / entriesPerPage);
 
     const clearFilters = () => {
         setFilterType("ALL");
@@ -323,136 +346,51 @@ export default function Transactions() {
 
     return (
         <Layout>
-            <div className="space-y-8 max-w-7xl mx-auto pb-20">
-                {/* Header Section */}
-                <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-8">
-                    <div className="flex items-center gap-5">
-                        <div className="p-5 bg-brand rounded-3xl shadow-2xl shadow-brand/20">
-                            <HiOutlineCollection className="text-4xl text-white" />
+            <div className="space-y-10 max-w-7xl mx-auto pb-20 px-4">
+                {/* Executive Header Segment */}
+                <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-10 bg-slate-900/40 p-10 rounded-[3rem] border border-slate-800/50 backdrop-blur-xl">
+                    <div className="flex items-center gap-6">
+                        <div className="p-6 bg-brand rounded-3xl shadow-2xl shadow-brand/30">
+                            <HiOutlineRectangleStack className="text-4xl text-white" />
                         </div>
-                        <div>
-                            <h2 className="text-4xl font-black text-white tracking-tighter">Audit Ledger</h2>
-                            <p className="text-slate-500 font-medium text-sm">Active cryptographic record of all settlements.</p>
+                        <div className="space-y-1">
+                            <h2 className="text-4xl font-black text-white tracking-tighter uppercase">Audit Ledger</h2>
+                            <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">Active cryptographic record of all settlements</p>
                         </div>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row items-center gap-4">
-                        <div className="relative group w-full sm:w-80">
-                            <HiOutlineSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-brand transition-colors" />
+                    <div className="flex flex-col md:flex-row items-center gap-4 bg-slate-950/50 p-3 rounded-[2.5rem] border border-slate-800/50">
+                        <div className="relative group w-full md:w-80">
+                            <HiOutlineMagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-brand transition-all" />
                             <input
                                 type="text"
-                                placeholder="Search ledger entries..."
-                                className="input-field pl-11 py-4 text-xs group-focus-within:border-brand/40"
+                                placeholder="Universal Ledger Search..."
+                                className="input-field pl-11 py-4 text-[11px] font-bold bg-transparent border-none group-focus-within:ring-0 placeholder:text-slate-600"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
                         </div>
-                        <ExportMenu
-                            data={filteredTransactions}
-                            onExportPDF={() => setIsProfileModalOpen(true)}
-                        />
-                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <div className="h-8 w-px bg-slate-800 hidden md:block"></div>
+                        <div className="flex items-center gap-2 w-full md:w-auto">
+                            <ExportMenu
+                                data={filteredTransactions}
+                                onExportPDF={() => setIsProfileModalOpen(true)}
+                            />
                             <button
                                 onClick={() => setIsImportOpen(true)}
-                                className="flex-1 sm:flex-none px-6 py-4 bg-emerald-600/10 text-emerald-500 hover:bg-emerald-600 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border border-emerald-600/20 flex items-center justify-center gap-2"
+                                className="p-4 bg-emerald-600/10 text-emerald-500 hover:bg-emerald-600 hover:text-white rounded-2xl transition-all border border-emerald-600/20"
+                                title="Import Data"
                             >
-                                <HiOutlineDownload className="rotate-180" /> Import
+                                <HiOutlineArrowDownTray className="text-xl" />
                             </button>
                             <button
                                 onClick={clearFilters}
-                                className="flex-1 sm:flex-none px-6 py-4 bg-slate-800 text-slate-300 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border border-slate-700 hover:border-slate-500 flex items-center justify-center gap-2"
+                                className="p-4 bg-slate-800 text-slate-400 hover:text-white rounded-2xl transition-all border border-slate-700"
+                                title="Reset Application Filters"
                             >
-                                <HiOutlineX /> Reset
+                                <HiOutlineXMark className="text-xl" />
                             </button>
                         </div>
-                    </div>
-                </div>
-
-                {/* Filter Panel */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 bg-slate-900/30 p-6 rounded-[2rem] border border-slate-800/50">
-                    {/* Category */}
-                    <div className="space-y-2">
-                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest pl-1">Category</label>
-                        <div className="relative">
-                            <select
-                                className="input-field py-3 text-[10px] appearance-none font-bold uppercase tracking-wider"
-                                value={filterType}
-                                onChange={(e) => setFilterType(e.target.value)}
-                            >
-                                <option value="ALL">All Settlements</option>
-                                <option value="RENT">Rent Only</option>
-                                <option value="BILL">Utility Bills</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    {/* Property */}
-                    <div className="space-y-2">
-                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest pl-1">Target Asset</label>
-                        <select
-                            className="input-field py-3 text-[10px] appearance-none font-bold uppercase tracking-wider"
-                            value={filterProperty}
-                            onChange={(e) => setFilterProperty(e.target.value)}
-                        >
-                            <option value="ALL">All Properties</option>
-                            {properties.map(p => (
-                                <option key={p.id} value={p.id}>{p.name}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* Status */}
-                    <div className="space-y-2">
-                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest pl-1">Status</label>
-                        <select
-                            className="input-field py-3 text-[10px] appearance-none font-bold uppercase tracking-wider"
-                            value={filterStatus}
-                            onChange={(e) => setFilterStatus(e.target.value)}
-                        >
-                            <option value="ALL">All States</option>
-                            <option value="PAID">Settle/Paid</option>
-                            <option value="UNPAID">Pending/Unpaid</option>
-                        </select>
-                    </div>
-
-                    {/* Utility Type - Conditional */}
-                    <div className={`space-y-2 transition-opacity duration-300 ${filterType !== "BILL" ? "opacity-30 pointer-events-none" : "opacity-100"}`}>
-                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest pl-1">Utility Type</label>
-                        <select
-                            className="input-field py-3 text-[10px] appearance-none font-bold uppercase tracking-wider"
-                            value={filterUtility}
-                            onChange={(e) => setFilterUtility(e.target.value)}
-                        >
-                            <option value="ALL">All Utilities</option>
-                            <option value="ELECTRICITY">Electricity</option>
-                            <option value="GAS">Gas</option>
-                            <option value="WIFI">Wifi</option>
-                            <option value="WATER">Water</option>
-                            <option value="COUNCIL">Council</option>
-                            <option value="OTHER">Other</option>
-                        </select>
-                    </div>
-
-                    {/* Date Range Start */}
-                    <div className="space-y-2">
-                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest pl-1">From Date</label>
-                        <input
-                            type="date"
-                            className="input-field py-2 text-[10px]"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                        />
-                    </div>
-
-                    {/* Date Range End */}
-                    <div className="space-y-2">
-                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest pl-1">To Date</label>
-                        <input
-                            type="date"
-                            className="input-field py-2 text-[10px]"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                        />
                     </div>
                 </div>
 
@@ -462,19 +400,146 @@ export default function Transactions() {
                             <div className="w-2 h-2 rounded-full bg-brand animate-pulse"></div>
                             <h3 className="font-black text-slate-400 uppercase tracking-[0.2em] text-[10px]">Active Ledger</h3>
                         </div>
-                        <span className="text-[10px] font-black text-brand uppercase tracking-tighter bg-brand/10 border border-brand/20 px-4 py-1.5 rounded-full">
-                            {filteredTransactions.length} Matches Found
-                        </span>
+
+                        {/* Integrated Filter Matrix */}
+                        <div className="hidden lg:flex items-center gap-1 bg-slate-950/60 p-1 rounded-2xl border border-slate-800/80 shadow-2xl backdrop-blur-xl group/ledger-filters">
+                            {/* Date Range Core */}
+                            <div className="flex items-center gap-3 px-4 py-1.5 border-r border-slate-800/40 group/date">
+                                <HiOutlineCalendarDays className="text-brand text-sm opacity-60 group-hover/date:opacity-100 transition-all duration-300" />
+                                <div className="flex items-center gap-1.5 bg-slate-900/60 px-3 py-1 rounded-xl border border-slate-800/50 shadow-inner group-focus-within/date:border-brand/40 transition-all">
+                                    <input
+                                        type="date"
+                                        className="bg-transparent text-[10px] text-slate-400 font-black outline-none w-[105px] border-none p-0 cursor-pointer hover:text-white transition-colors uppercase tracking-tight"
+                                        value={startDate}
+                                        onChange={(e) => setStartDate(e.target.value)}
+                                    />
+                                    <div className="w-1.5 h-[2px] bg-slate-800 rounded-full" />
+                                    <input
+                                        type="date"
+                                        className="bg-transparent text-[10px] text-slate-400 font-black outline-none w-[105px] border-none p-0 cursor-pointer hover:text-white transition-colors uppercase tracking-tight"
+                                        value={endDate}
+                                        onChange={(e) => setEndDate(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Matrix Selectors */}
+                            <div className="flex items-center px-2 gap-1">
+                                <div className="relative group/sel">
+                                    <select
+                                        className="bg-transparent text-[9px] text-slate-500 font-black uppercase tracking-[0.15em] outline-none cursor-pointer hover:text-brand transition-all appearance-none px-4 py-2 hover:bg-slate-900/40 rounded-xl"
+                                        value={filterType}
+                                        onChange={(e) => setFilterType(e.target.value)}
+                                    >
+                                        <option value="ALL">All Segments</option>
+                                        <option value="RENT">Housing Rent</option>
+                                        <option value="BILL">Utility Bills</option>
+                                    </select>
+                                </div>
+
+                                <div className="w-px h-4 bg-slate-800/60" />
+
+                                <div className="relative group/sel">
+                                    <select
+                                        className="bg-transparent text-[9px] text-slate-500 font-black uppercase tracking-[0.15em] outline-none cursor-pointer hover:text-brand transition-all appearance-none px-4 py-2 hover:bg-slate-900/40 rounded-xl max-w-[140px]"
+                                        value={filterProperty}
+                                        onChange={(e) => setFilterProperty(e.target.value)}
+                                    >
+                                        <option value="ALL">Universal Assets</option>
+                                        {properties.map(p => (
+                                            <option key={p.id} value={p.id}>{p.name.toUpperCase()}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="w-px h-4 bg-slate-800/60" />
+
+                                <div className="relative group/sel">
+                                    <select
+                                        className="bg-transparent text-[9px] text-slate-500 font-black uppercase tracking-[0.15em] outline-none cursor-pointer hover:text-brand transition-all appearance-none px-4 py-2 hover:bg-slate-900/40 rounded-xl"
+                                        value={filterStatus}
+                                        onChange={(e) => setFilterStatus(e.target.value)}
+                                    >
+                                        <option value="ALL">All Status</option>
+                                        <option value="PAID">Settle/Paid</option>
+                                        <option value="UNPAID">Outstanding</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Flush Controls */}
+                            {(filterType !== 'ALL' || filterProperty !== 'ALL' || filterStatus !== 'ALL' || startDate || endDate) && (
+                                <button
+                                    onClick={clearFilters}
+                                    className="p-2 mr-1 bg-brand/5 text-brand hover:bg-brand hover:text-white rounded-xl transition-all border border-brand/20 group/reset active:scale-90"
+                                    title="Flush Filter Matrix"
+                                >
+                                    <HiOutlineArrowPath className="text-[11px] group-hover/reset:rotate-180 transition-transform duration-700 ease-in-out" />
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="flex items-center gap-4">
+                            <span className="text-[10px] font-black text-brand uppercase tracking-tighter bg-brand/10 border border-brand/20 px-4 py-1.5 rounded-full">
+                                {filteredTransactions.length} Matches Found
+                            </span>
+                        </div>
                     </div>
 
                     <div className="p-4 sm:p-8 overflow-x-auto min-h-[400px]">
                         <TransactionList
-                            transactions={filteredTransactions}
+                            transactions={paginatedTransactions}
                             loading={loading}
                             onSelect={handleSelect}
                             onEdit={handleEdit}
                             onDelete={handleDelete}
                         />
+                    </div>
+
+                    {/* Pagination Footer */}
+                    <div className="px-8 py-6 border-t border-slate-800/50 bg-slate-950/20 flex flex-col sm:flex-row items-center justify-between gap-6">
+                        <div className="flex items-center gap-4">
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">Show</span>
+                            <div className="relative group">
+                                <select
+                                    className="bg-slate-900 border border-slate-800 text-white text-[10px] font-black py-2 pl-4 pr-10 rounded-xl appearance-none cursor-pointer focus:border-brand/40 outline-none transition-all uppercase"
+                                    value={entriesPerPage}
+                                    onChange={(e) => {
+                                        setEntriesPerPage(Number(e.target.value));
+                                        setCurrentPage(1);
+                                    }}
+                                >
+                                    <option value={10}>10 Records</option>
+                                    <option value={20}>20 Records</option>
+                                    <option value={50}>50 Records</option>
+                                    <option value={100}>100 Records</option>
+                                </select>
+                                <HiChevronUpDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 group-hover:text-white pointer-events-none transition-colors" />
+                            </div>
+                            <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest hidden sm:inline">Per Segment</span>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mr-4">
+                                Page <span className="text-white">{currentPage}</span> of <span className="text-slate-400">{totalPages || 1}</span>
+                            </p>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                    disabled={currentPage === 1}
+                                    className="p-3 bg-slate-900 border border-slate-800 text-slate-400 rounded-xl hover:text-white hover:bg-brand/20 hover:border-brand/40 disabled:opacity-20 disabled:pointer-events-none transition-all"
+                                >
+                                    <HiOutlineChevronLeft className="text-lg" />
+                                </button>
+                                <button
+                                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                    disabled={currentPage === totalPages || totalPages === 0}
+                                    className="p-3 bg-slate-900 border border-slate-800 text-slate-400 rounded-xl hover:text-white hover:bg-brand/20 hover:border-brand/40 disabled:opacity-20 disabled:pointer-events-none transition-all"
+                                >
+                                    <HiOutlineChevronRight className="text-lg" />
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -531,7 +596,7 @@ export default function Transactions() {
                                             Select Export Name
                                         </DialogTitle>
                                         <button onClick={() => setIsProfileModalOpen(false)} className="text-slate-500 hover:text-white">
-                                            <HiOutlineX className="text-2xl" />
+                                            <HiOutlineXMark className="text-2xl" />
                                         </button>
                                     </div>
 
@@ -601,7 +666,7 @@ export default function Transactions() {
                                             Report Configuration
                                         </DialogTitle>
                                         <button onClick={() => setIsOptionsModalOpen(false)} className="text-slate-500 hover:text-white">
-                                            <HiOutlineX className="text-2xl" />
+                                            <HiOutlineXMark className="text-2xl" />
                                         </button>
                                     </div>
 
@@ -685,7 +750,7 @@ export default function Transactions() {
                                                 }}
                                                 className="w-full py-5 bg-brand text-white font-black uppercase tracking-[0.2em] rounded-2xl shadow-2xl shadow-brand/20 hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
                                             >
-                                                <HiOutlineDocumentDownload className="text-xl" />
+                                                <HiOutlineArrowDownTray className="text-xl" />
                                                 Finalize & Download PDF
                                             </button>
                                             <button
