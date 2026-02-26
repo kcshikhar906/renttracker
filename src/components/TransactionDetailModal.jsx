@@ -11,10 +11,12 @@ import {
     HiOutlineDocumentText,
     HiOutlineClock
 } from "react-icons/hi";
-import { format, isValid, parseISO, differenceInDays } from "date-fns";
+import { format, isValid, parseISO, differenceInDays, addDays } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { HiOutlineArrowDownTray } from "react-icons/hi2";
+import { db } from "../firebase";
+import { collection, addDoc, serverTimestamp, Timestamp } from "firebase/firestore";
 
 export default function TransactionDetailModal({ isOpen, onClose, transaction, onDelete }) {
     const [isFullscreen, setIsFullscreen] = React.useState(false);
@@ -72,7 +74,19 @@ export default function TransactionDetailModal({ isOpen, onClose, transaction, o
             doc.text(`AUTHENTICATED LEDGER RECORD • REF: ${transaction.id.substring(0, 12).toUpperCase()}`, 105, 30, { align: "center" });
             doc.text(`GENERATED ON ${format(new Date(), "MMMM dd, yyyy @ hh:mm a")}`, 105, 36, { align: "center" });
 
-            // 2. Primary Information Box
+            // 2. Security Gatekeeper: Create Share Ticket
+            const shareRef = await addDoc(collection(db, "shared_links"), {
+                transactionId: transaction.id,
+                propertyName: transaction.propertyName,
+                fileUrl: transaction.fileUrl,
+                createdAt: serverTimestamp(),
+                expiresAt: Timestamp.fromDate(addDays(new Date(), 7)),
+                isAuditVerified: true
+            });
+
+            const verifyUrl = `${window.location.origin}/verify/${shareRef.id}`;
+
+            // 3. Primary Information Box
             doc.setTextColor(30, 41, 59); // Slate-800
             doc.setFontSize(14);
             doc.setFont(undefined, 'bold');
@@ -129,14 +143,14 @@ export default function TransactionDetailModal({ isOpen, onClose, transaction, o
                 doc.setFontSize(10);
                 doc.setFont(undefined, 'normal');
                 doc.setTextColor(79, 70, 229); // Brand Indigo
-                doc.text("View Original Receipt / Proof Image", 14, linkY + 8);
+                doc.text("Access Authenticated Proof / Receipt Image", 14, linkY + 8);
 
-                // Add a clickable link over the text
-                doc.link(14, linkY + 2, 80, 10, { url: transaction.fileUrl });
+                // Add a clickable link over the text pointing to our PROXY page
+                doc.link(14, linkY + 2, 85, 10, { url: verifyUrl });
 
                 doc.setFontSize(8);
                 doc.setTextColor(148, 163, 184);
-                doc.text("(Opens in your default browser)", 14, linkY + 14);
+                doc.text(`Link expires in 7 days • Security ID: ${shareRef.id.substring(0, 8)}`, 14, linkY + 14);
             }
 
             // 5. Footer

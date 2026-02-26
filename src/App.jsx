@@ -7,6 +7,7 @@ import Transactions from "./components/Transactions";
 import Settings from "./components/Settings";
 import Login from "./components/Login";
 import Signup from "./components/Signup";
+import ProofVerifier from "./components/ProofVerifier";
 
 function App() {
   return (
@@ -39,6 +40,7 @@ function App() {
           />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/verify/:token" element={<ProofVerifier />} />
         </Routes>
       </AuthProvider>
     </Router>
