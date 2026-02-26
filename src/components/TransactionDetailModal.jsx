@@ -9,18 +9,21 @@ import {
     HiOutlineCalendar,
     HiOutlineCurrencyDollar,
     HiOutlineDocumentText,
-    HiOutlineClock
+    HiOutlineClock,
+    HiOutlineLink
 } from "react-icons/hi";
 import { format, isValid, parseISO, differenceInDays, addDays } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { HiOutlineArrowDownTray } from "react-icons/hi2";
+import { HiOutlineArrowDownTray, HiOutlineShieldCheck } from "react-icons/hi2";
 import { db } from "../firebase";
 import { collection, addDoc, serverTimestamp, Timestamp } from "firebase/firestore";
 
 export default function TransactionDetailModal({ isOpen, onClose, transaction, onDelete }) {
     const [isFullscreen, setIsFullscreen] = React.useState(false);
     const [isGenerating, setIsGenerating] = React.useState(false);
+    const [isSharing, setIsSharing] = React.useState(false);
+    const [copied, setCopied] = React.useState(false);
 
     if (!transaction) return null;
 
@@ -79,6 +82,15 @@ export default function TransactionDetailModal({ isOpen, onClose, transaction, o
                 transactionId: transaction.id,
                 propertyName: transaction.propertyName,
                 fileUrl: transaction.fileUrl,
+                amount: transaction.amount,
+                tenant: transaction.tenant || null,
+                type: transaction.type,
+                status: transaction.status,
+                date: transaction.date,
+                periodStart: transaction.periodStart || null,
+                periodEnd: transaction.periodEnd || null,
+                utilityType: transaction.utilityType || null,
+                notes: transaction.notes || null,
                 createdAt: serverTimestamp(),
                 expiresAt: Timestamp.fromDate(addDays(new Date(), 7)),
                 isAuditVerified: true
@@ -164,6 +176,41 @@ export default function TransactionDetailModal({ isOpen, onClose, transaction, o
             alert("Failed to generate PDF Statement.");
         } finally {
             setIsGenerating(false);
+        }
+    };
+
+    const handleShare = async () => {
+        try {
+            setIsSharing(true);
+            // Create Share Ticket
+            const shareRef = await addDoc(collection(db, "shared_links"), {
+                transactionId: transaction.id,
+                propertyName: transaction.propertyName,
+                fileUrl: transaction.fileUrl,
+                amount: transaction.amount,
+                tenant: transaction.tenant || null,
+                type: transaction.type,
+                status: transaction.status,
+                date: transaction.date,
+                periodStart: transaction.periodStart || null,
+                periodEnd: transaction.periodEnd || null,
+                utilityType: transaction.utilityType || null,
+                notes: transaction.notes || null,
+                createdAt: serverTimestamp(),
+                expiresAt: Timestamp.fromDate(addDays(new Date(), 7)),
+                isAuditVerified: true
+            });
+
+            const verifyUrl = `${window.location.origin}/verify/${shareRef.id}`;
+            await navigator.clipboard.writeText(verifyUrl);
+
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch (err) {
+            console.error("Share error:", err);
+            alert("Failed to generate secure link.");
+        } finally {
+            setIsSharing(false);
         }
     };
 
@@ -359,12 +406,23 @@ export default function TransactionDetailModal({ isOpen, onClose, transaction, o
                                                 Erase Record
                                             </button>
                                             <button
+                                                onClick={handleShare}
+                                                disabled={isSharing}
+                                                className={`w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-5 border rounded-[1.5rem] font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-lg active:scale-95 disabled:opacity-50 ${copied
+                                                    ? "bg-brand text-white border-brand scale-105"
+                                                    : "bg-brand/10 text-brand border-brand/20 hover:bg-brand hover:text-white"
+                                                    }`}
+                                            >
+                                                {copied ? <HiOutlineShieldCheck className="text-lg" /> : <HiOutlineLink className="text-lg" />}
+                                                {copied ? "Copied!" : isSharing ? "Verifying..." : "Share Link"}
+                                            </button>
+                                            <button
                                                 onClick={generatePDF}
                                                 disabled={isGenerating}
                                                 className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-[1.5rem] font-black text-[10px] uppercase tracking-[0.2em] hover:bg-emerald-500 hover:text-white transition-all shadow-lg active:scale-95 disabled:opacity-50"
                                             >
                                                 <HiOutlineArrowDownTray className="text-lg" />
-                                                {isGenerating ? "Encrypting..." : "Download Statement"}
+                                                {isGenerating ? "Encrypting..." : "Statement"}
                                             </button>
                                             <button
                                                 onClick={onClose}
